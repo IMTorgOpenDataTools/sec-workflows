@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""
+Process to initialize and listen for updates to the SEC EDGAR Database.
+"""
+__author__ = "Jason Beach"
+__version__ = "0.1.0"
+__license__ = "MIT"
+
+
+
+#third-party
+import pandas as pd
+import sqlalchemy as sql                     #create_engine
+from sqlalchemy import Table, Column, Integer, String, MetaData
+import sqlalchemy_utils as sql_util         #database_exists, create_database
+
+#built-in
+from pathlib import Path
+import logging
+import time
+from datetime import date
+import requests
+import argparse
+
+#my libs
+from database import Database
+from utils import (
+    load_target_firms,
+    poll_sec_edgar,
+    initialize_db,
+    create_report,
+)
+import sys
+sys.path.append(Path('config').absolute().as_posix() )
+from _constants import (
+    log_file,
+    db_file,
+    table_name,
+    MINUTES_BETWEEN_CHECKS,
+    QUARTERS_IN_TABLE,
+    OUTPUT_REPORT_PATH,
+    accts,
+    meta,
+    filings,
+    FilingMetadata
+)
+
+
+
+
+ciks = ['0000036104']
+"""
+JPM: 19617
+C: 831001
+WFC: 72971
+BAC: 70858
+USB: 36104
+PNC: 713676
+GS: 886982
+TFC: 92230
+ALLY: 40729
+CFG: 759944
+"""
+
+
+
+#configure
+logging.basicConfig(filename=log_file, encoding='utf-8', level=logging.INFO, format='%(asctime)s %(message)s')
+logger = logging.getLogger(__name__)
+
+
+
+
+
+
+
+def main(args):
+    """Application entrypoint
+    """
+    logger.info(f'Starting process in {args.mode[0]} mode')
+
+    db = Database(db_file = db_file,
+                    table_name= table_name,
+                    meta = meta,
+                    logger = logger
+                    )
+
+    #check db file
+    check = db.check_db_file()
+
+    #check db schema
+    db.check_db_schema()
+
+    #process
+    match args.mode[0]:
+        case 'init':
+            initialize_db(db, ciks, accts)
+            create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
+            logger.info(f'Database initialization complete')
+        case 'run':
+            while True:
+                changed_data = poll_sec_edgar(db, ciks)
+                if changed_data:
+                    print("sec edgar changed")
+                    db.update_database()
+                    print("database updated")
+                    create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
+                    print("report created")
+                else:
+                    print("no change to server")
+                secs = MINUTES_BETWEEN_CHECKS * 60
+                time.sleep(secs)
+
+    logger.info(f'Process exited')
+                    
+
+
+
+if __name__ == "__main__":
+    """Main entry point to the application.
+
+    App start is executed in one of the following two modes:
+      * `init`ialize system by creating new db with records or validate current records if db is present
+      * `run` the listener for updates (8-K, 10-K/-Q), periodically, then create a report and output to directory
+    
+    ....
+    """
+    parser = argparse.ArgumentParser()
+
+    # Required positional argument
+    parser.add_argument("mode",
+                        default='init',
+                        nargs=1,
+                        choices=['init', 'run'], 
+                        help="`init`ialize or `run` the process"
+                        )
+    args = parser.parse_args()
+
+    main(args)

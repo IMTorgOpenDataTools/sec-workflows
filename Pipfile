@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pandas = "*"
+numpy = "*"
+rapidfuzz = "*"
+requests = "*"
+bs4 = "*"
+pytest = "*"
+lxml = "*"
+flask = "*"
+sqlalchemy = "*"
+install = "*"
+sqlalchemy-utils = "*"
+flask-restful = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"

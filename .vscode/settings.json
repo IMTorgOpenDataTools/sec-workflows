@@ -1,0 +1,23 @@
+{
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/*.pyc": true,
+        "**/__pycache__": true
+    },
+    "python.pipenvPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
+    "python.linting.pylintPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
+    "python.autoComplete.extraPaths": ["/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python"],
+    "python.defaultInterpreterPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
+    "python.analysis.extraPaths": [
+        "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/"
+    ]
+}

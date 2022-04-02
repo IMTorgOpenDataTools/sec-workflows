@@ -16,6 +16,7 @@ sqlalchemy = "*"
 install = "*"
 sqlalchemy-utils = "*"
 flask-restful = "*"
+sec-edgar-downloader = {path = "./.lib/sec-edgar-downloader"}
 
 [dev-packages]
 

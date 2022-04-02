@@ -4,14 +4,19 @@ Module Docstring
 """
 from asyncio.log import logger
 import pandas as pd
+import sqlalchemy as sql
 from pathlib import Path
 import time
-from datetime import date
+from datetime import date, timedelta
 import requests
+
+from sec_edgar_downloader import Downloader, Firm
+
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     log_file,
+    sec_edgar_downloads_path,
     db_file,
     table_name,
     MINUTES_BETWEEN_CHECKS,
@@ -27,17 +32,44 @@ url_api_account = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{}/us-gaap/{}
 
 
 
-def load_target_firms():
+def load_firms(file_path):
     """Load file containing firms."""
-    pass
+    df = pd.read_csv(file_path)
+    firm_lst = df['CIK'].to_list()
+    cik_lst = [str(cik).zfill(10) for cik in firm_lst]
+    ticker_lst = df['Ticker'].to_list()
+    return cik_lst, ticker_lst
 
 
-#TODO: def request_from_api():
-headers = {
-        'User-Agent': 'IMTorg',
-        'From': 'jason.beach@mgmt-tech.org',
+ 
+
+
+def api_request(type, cik, acct):
+    headers = {
+        'User-Agent': 'RandomFirm',
+        'From': 'first.last@gmail.com',
         'Accept-Encoding': 'gzip, deflate'
         }
+    url_firm_details = "https://data.sec.gov/submissions/CIK{}.json"
+    url_company_concept = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{}/us-gaap/{}.json'     #long_cik, acct
+    match type:
+        case 'firm_details': 
+            filled_url = url_firm_details.format(cik)
+            keys = ('filings','recent')
+        case 'concept': 
+            filled_url = url_company_concept.format(cik, acct)
+            keys = ('units','USD')
+        case _:
+            logger.warning(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
+            exit()
+    edgar_resp = requests.get(filled_url, headers=headers)
+    if edgar_resp.status_code == 200:
+        items = edgar_resp.json()[keys[0]][keys[1]]
+        return items
+    else:
+        logger.warning(f'edgar response returned status code {edgar_resp.status_code}')
+        return None
+
 
 
 def remove_list_dups(lst, key):
@@ -54,17 +86,57 @@ def remove_list_dups(lst, key):
 
 
 
+#for each cik:
+# get the most-recent 8-K/99.* filing
+# extract accts 
+# load into sqlite
+#add 8-K acct that is newer than 10-k
+def get_recent_financial_release(tickers, ciks):
+    """Search and download the most-recent 8-K/EX-99.* documents."""
+    def check(row): 
+        return 'EX-99.1' in row.Type if type(row.Type) == str else False   #TODO:add 99.2+
+
+    start = date.today() - timedelta(days=90)
+    banks = [Firm(ticker=bank[1]) for bank in tickers]
+    dl = Downloader(sec_edgar_downloads_path)
+    for bank in banks:
+        ticker = bank.get_info()['ticker']
+        urls = dl.get_urls("8-K",
+                            ticker,
+                            after = start.strftime("%Y-%m-%d")
+                            )
+    df = dl.filing_storage.get_dataframe(mode='document')
+    sel1 = df[(df['short_cik'].isin(ciks)) & (df['file_type'] == '8-K') & (df['FS_Location'] == '')]
+    mask = sel1.apply(check, axis=1)
+    sel2 = sel1[mask] 
+    lst_of_idx = sel2.index.tolist()
+    staged = dl.filing_storage.get_document_in_record( lst_of_idx )
+    downloaded_docs = dl.get_documents_from_url_list(staged)
+    return downloaded_docs
+
+
+def extract_accounts_from_documents(docs):
+    for doc in docs:
+        doc.FS_Location
+        #TODO:extraction module
+    pass
+
+
+
+
+
+
 def initialize_db(db, ciks, accts):
     """Initialize the database
     """
     #TODO: use requests.session to improve speed
     recs = []
     for cik in ciks:
-        for acct in accts.keys():
-            print(acct)
-            url_filled = url_api_account.format(cik, acct) 
-            edgar_resp = requests.get(url_filled, headers=headers)
-            items = edgar_resp.json()['units']['USD']
+        for acct in accts.values():
+            logger.info(f'api request for account: {acct}')
+            items = api_request(type='concept', cik=cik, acct=acct)
+            if not items:
+                break
             items.reverse()
             items_dedup = remove_list_dups(items, 'accn')
             items_dedup.reverse()
@@ -75,7 +147,7 @@ def initialize_db(db, ciks, accts):
                 rec = FilingMetadata(
                         cik = cik,
                         accn = item['accn'],
-                        acct = accts[acct],
+                        acct = acct,
                         val = item['val'],
                         fy = item['fy'],
                         fp = item['fp'],
@@ -85,20 +157,27 @@ def initialize_db(db, ciks, accts):
                 )
                 recs.append( rec )
             time.sleep(1)
-    df = pd.DataFrame(recs, columns=FilingMetadata._fields)
-
-    df_columns = df.drop(labels=['acct','val'], axis=1).drop_duplicates(subset=['cik','accn'])
-    df_wide = df.pivot(index=['cik','accn'], columns='acct', values='val').reset_index()
-    df_wide_total = pd.merge(df_wide, df_columns, on=['cik','accn'], how='left')
-    df_wide_total['filed'] = pd.to_datetime(df_wide_total['filed'])
-    df_wide_total.sort_values(by='filed', ascending=False, inplace=True)
-    df_wide_total.to_sql(db.table_name, 
-                con=db.engine,
-                if_exists='append', 
-                index=False
-                )
-    #print(df_wide_total)
-    print(f'Inserted {df_wide_total.shape[0]} records to table {db.table_name}')
+    if len(recs) > 0:
+        df = pd.DataFrame(recs, columns=FilingMetadata._fields)
+        df_columns = df.drop(labels=['acct','val'], axis=1).drop_duplicates(subset=['cik','accn'])
+        df_wide = df.pivot(index=['cik','accn'], columns='acct', values='val').reset_index()
+        df_wide_total = pd.merge(df_wide, df_columns, on=['cik','accn'], how='left')
+        df_wide_total['filed'] = pd.to_datetime(df_wide_total['filed'])
+        df_wide_total.sort_values(by='filed', ascending=False, inplace=True)
+        try:
+            df_wide_total.to_sql(db.table_name, 
+                    con=db.engine,
+                    if_exists='append', 
+                    index=False
+                    )
+        except sql.exc.IntegrityError as e:
+            logger.warning('Unique key violation on insert')
+            return False
+        else:
+            logger.info(f'Inserted {df_wide_total.shape[0]} records to table {db.table_name}')
+            return True
+    else:
+        return False
 
 
 
@@ -112,10 +191,7 @@ def poll_sec_edgar(db, ciks):
 
     result_df = []
     for cik in ciks:
-        url_filled = url_firm_details.format(cik)
-        edgar_resp = requests.get(url_filled, headers=headers)
-        recent = edgar_resp.json()['filings']['recent']
-
+        recent = api_request(type='firm_details', cik=cik, acct=None)
         recs = []
         keys = recent.keys()
         for item in range(len(recent['filingDate'])):
@@ -151,8 +227,11 @@ def create_report(report_type, db, output_path):
 
     def report_long(output_path):
         df = db.query_database()
-        df.to_csv(output_path, index=False)
-        logger.info(f'Report saved to path: {output_path}')
+        if df.shape[0] > 0:
+            df.to_csv(output_path, index=False)
+            logger.info(f'Report saved to path: {output_path}')
+        else:
+            logger.info(f'No data available to report')
         return None
 
 

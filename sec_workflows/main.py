@@ -25,7 +25,7 @@ import argparse
 #my libs
 from database import Database
 from utils import (
-    load_target_firms,
+    load_firms,
     poll_sec_edgar,
     initialize_db,
     create_report,
@@ -33,6 +33,8 @@ from utils import (
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
+    firms_file,
+    accounts_file,
     log_file,
     db_file,
     table_name,
@@ -44,24 +46,6 @@ from _constants import (
     filings,
     FilingMetadata
 )
-
-
-
-
-ciks = ['0000036104']
-"""
-JPM: 19617
-C: 831001
-WFC: 72971
-BAC: 70858
-USB: 36104
-PNC: 713676
-GS: 886982
-TFC: 92230
-ALLY: 40729
-CFG: 759944
-"""
-
 
 
 #configure
@@ -79,6 +63,8 @@ def main(args):
     """
     logger.info(f'Starting process in {args.mode[0]} mode')
 
+    #configure
+    ciks, tickers = load_firms(firms_file)
     db = Database(db_file = db_file,
                     table_name= table_name,
                     meta = meta,
@@ -94,9 +80,12 @@ def main(args):
     #process
     match args.mode[0]:
         case 'init':
-            initialize_db(db, ciks, accts)
-            create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
-            logger.info(f'Database initialization complete')
+            updated = initialize_db(db, ciks, accts)
+            if updated: 
+                create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
+                logger.info(f'Database initialization complete')
+            else:
+                logger.info(f'No databae update necessary')
         case 'run':
             while True:
                 changed_data = poll_sec_edgar(db, ciks)

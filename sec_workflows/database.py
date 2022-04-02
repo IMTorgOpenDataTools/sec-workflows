@@ -23,7 +23,6 @@ import requests
 
 #my libs
 from utils import (
-    load_target_firms,
     remove_list_dups,
 )
 import sys

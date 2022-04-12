@@ -5,7 +5,15 @@ Pull data from SEC EDGAR and maintain in a database.
 
 ## Quick Start
 
-`$ python /workspaces/Prj-sec_workflows/sec_workflows/main.py init`
+Ensure `IMTorg/sec-edgar-downloader` is available.
+
+```
+mkdir .lib
+mv sec-edgar-downloader-feature-address_multiple_issues/ .lib/
+pipenv install .lib/sec-edgar-downloader-feature-address_multiple_issues/.
+pipenv install .
+python /workspaces/Prj-sec_workflows/sec_workflows/main.py init
+```
 
 or 
 

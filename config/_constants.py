@@ -12,9 +12,10 @@ def load_accounts(file_path):
     """Load file containing accounts."""
     account_dict = {}
     with open(file_path, 'r') as f:
-        for line in f.readlines()[:-1]:
-            k,v = line.split(',')
-            account_dict[k] = v
+        lines = f.readlines()
+    for line in lines[1:]:
+        k,v = line.replace('\n','').split(',')
+        account_dict[k] = v
     return account_dict  
 
 

@@ -10,7 +10,8 @@ import time
 from datetime import date, timedelta
 import requests
 
-from sec_edgar_downloader import Downloader, Firm
+from sec_edgar_downloader import Downloader
+from sec_edgar_downloader import UrlComponent as uc
 
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
@@ -97,7 +98,7 @@ def get_recent_financial_release(tickers, ciks):
         return 'EX-99.1' in row.Type if type(row.Type) == str else False   #TODO:add 99.2+
 
     start = date.today() - timedelta(days=90)
-    banks = [Firm(ticker=bank[1]) for bank in tickers]
+    banks = [uc.Firm(ticker=bank[1]) for bank in tickers]
     dl = Downloader(sec_edgar_downloads_path)
     for bank in banks:
         ticker = bank.get_info()['ticker']
@@ -132,11 +133,11 @@ def initialize_db(db, ciks, accts):
     #TODO: use requests.session to improve speed
     recs = []
     for cik in ciks:
-        for acct in accts.values():
-            logger.info(f'api request for account: {acct}')
-            items = api_request(type='concept', cik=cik, acct=acct)
+        for acct_key, acct_val in accts.items():
+            logger.info(f'api request for account: {acct_key}')
+            items = api_request(type='concept', cik=cik, acct=acct_key)
             if not items:
-                break
+                continue
             items.reverse()
             items_dedup = remove_list_dups(items, 'accn')
             items_dedup.reverse()
@@ -147,7 +148,7 @@ def initialize_db(db, ciks, accts):
                 rec = FilingMetadata(
                         cik = cik,
                         accn = item['accn'],
-                        acct = acct,
+                        acct = acct_val,
                         val = item['val'],
                         fy = item['fy'],
                         fp = item['fp'],

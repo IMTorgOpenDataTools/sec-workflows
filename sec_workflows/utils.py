@@ -65,8 +65,10 @@ def api_request(type, cik, acct):
             exit()
     edgar_resp = requests.get(filled_url, headers=headers)
     if edgar_resp.status_code == 200:
-        items = edgar_resp.json()[keys[0]][keys[1]]
-        return items
+        if keys[0] in edgar_resp.json().keys():
+            if keys[1] in edgar_resp.json()[keys[0]].keys():
+                items = edgar_resp.json()[keys[0]][keys[1]]
+                return items
     else:
         logger.warning(f'edgar response returned status code {edgar_resp.status_code}')
         return None

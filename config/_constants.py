@@ -7,6 +7,21 @@ from collections import namedtuple
 from sqlalchemy import Table, Column, Integer, String, MetaData
 
 
+# SEC limits users to no more than 10 requests per second
+# Sleep 0.1s between each request to prevent rate-limiting
+# Source: https://www.sec.gov/developer
+SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL = 1
+
+# Number of times to retry a request to sec.gov
+MAX_RETRIES = 5
+
+# Time to wait for response from server (seconds)
+DEFAULT_TIMEOUT = 5
+
+
+
+
+
 
 def load_accounts(file_path):
     """Load file containing accounts."""

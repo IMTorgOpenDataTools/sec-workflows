@@ -8,7 +8,11 @@ import sqlalchemy as sql
 from pathlib import Path
 import time
 from datetime import date, timedelta
+
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import http
 
 from sec_edgar_downloader import Downloader
 from sec_edgar_downloader import UrlComponent as uc
@@ -20,6 +24,9 @@ from _constants import (
     sec_edgar_downloads_path,
     db_file,
     table_name,
+    MAX_RETRIES,
+    SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
+    DEFAULT_TIMEOUT,
     MINUTES_BETWEEN_CHECKS,
     QUARTERS_IN_TABLE,
     accts,
@@ -30,6 +37,34 @@ from _constants import (
 
 url_firm_details = "https://data.sec.gov/submissions/CIK{}.json"
 url_api_account = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{}/us-gaap/{}.json'     #long_cik, acct
+
+# Specify max number of request retries
+# https://stackoverflow.com/a/35504626/3820660
+retries = Retry(
+    total=MAX_RETRIES,
+    #backoff_factor=SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,        # sleep between requests with exponentially increasing interval: {backoff factor} * (2 ** ({number of total retries} - 1))
+    status_forcelist=[403, 500, 502, 503, 504],
+)
+
+#http.client.HTTPConnection.debuglevel = 1                      # display more information 
+
+class TimeoutHTTPAdapter(HTTPAdapter):
+    def __init__(self, *args, **kwargs):
+        self.timeout = DEFAULT_TIMEOUT
+        if "timeout" in kwargs:
+            self.timeout = kwargs["timeout"]
+            del kwargs["timeout"]
+        super().__init__(*args, **kwargs)
+
+    def send(self, request, **kwargs):
+        timeout = kwargs.get("timeout")
+        if timeout is None:
+            kwargs["timeout"] = self.timeout
+        return super().send(request, **kwargs)
+
+
+
+
 
 
 
@@ -45,10 +80,12 @@ def load_firms(file_path):
  
 
 
-def api_request(type, cik, acct):
+def api_request(session, type, cik, acct):
+    """Make a request with a given session."""
+    #prepare request
     headers = {
-        'User-Agent': 'RandomFirm',
-        'From': 'first.last@gmail.com',
+        'User-Agent': 'YoMmama',
+        'From': 'joe.blo@gmail.com',
         'Accept-Encoding': 'gzip, deflate'
         }
     url_firm_details = "https://data.sec.gov/submissions/CIK{}.json"
@@ -63,7 +100,9 @@ def api_request(type, cik, acct):
         case _:
             logger.warning(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
             exit()
-    edgar_resp = requests.get(filled_url, headers=headers)
+    #make request
+    edgar_resp = session.get(filled_url, headers=headers)
+    time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
     if edgar_resp.status_code == 200:
         if keys[0] in edgar_resp.json().keys():
             if keys[1] in edgar_resp.json()[keys[0]].keys():
@@ -130,36 +169,43 @@ def extract_accounts_from_documents(docs):
 
 
 def initialize_db(db, ciks, accts):
-    """Initialize the database
+    """Initialize the database.
     """
-    #TODO: use requests.session to improve speed
-    recs = []
-    for cik in ciks:
-        for acct_key, acct_val in accts.items():
-            logger.info(f'api request for account: {acct_key}')
-            items = api_request(type='concept', cik=cik, acct=acct_key)
-            if not items:
-                continue
-            items.reverse()
-            items_dedup = remove_list_dups(items, 'accn')
-            items_dedup.reverse()
-            end = len(items_dedup)
-            idx_start = end - QUARTERS_IN_TABLE if QUARTERS_IN_TABLE < end  else end 
-            tgt_items = items_dedup[idx_start:]
-            for item in tgt_items:
-                rec = FilingMetadata(
-                        cik = cik,
-                        accn = item['accn'],
-                        acct = acct_val,
-                        val = item['val'],
-                        fy = item['fy'],
-                        fp = item['fp'],
-                        form = item['form'],
-                        end = item['end'],
-                        filed = item['filed']
-                )
-                recs.append( rec )
-            time.sleep(1)
+    #request and populate records
+    with requests.Session() as client:
+        client.mount("http://", TimeoutHTTPAdapter(max_retries=retries))
+        client.mount("https://", TimeoutHTTPAdapter(max_retries=retries))
+        client.headers.update({
+            "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0"    # mimick the browser
+            })
+
+        recs = []
+        for cik in ciks:
+            for acct_key, acct_val in accts.items():
+                logger.info(f'api request for account: {acct_key}')
+                items = api_request(session=client, type='concept', cik=cik, acct=acct_key)
+                if not items:
+                    continue
+                items.reverse()
+                items_dedup = remove_list_dups(items, 'accn')
+                items_dedup.reverse()
+                end = len(items_dedup)
+                idx_start = end - QUARTERS_IN_TABLE if QUARTERS_IN_TABLE < end  else end 
+                tgt_items = items_dedup[idx_start:]
+                for item in tgt_items:
+                    rec = FilingMetadata(
+                            cik = cik,
+                            accn = item['accn'],
+                            acct = acct_val,
+                            val = item['val'],
+                            fy = item['fy'],
+                            fp = item['fp'],
+                            form = item['form'],
+                            end = item['end'],
+                            filed = item['filed']
+                    )
+                    recs.append( rec )
+    #prepare records and insert into db
     if len(recs) > 0:
         df = pd.DataFrame(recs, columns=FilingMetadata._fields)
         df_columns = df.drop(labels=['acct','val'], axis=1).drop_duplicates(subset=['cik','accn'])

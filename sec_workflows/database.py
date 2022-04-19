@@ -59,6 +59,7 @@ class Database:
             self.logger.warning('Database file not found.')
             return False
         else:
+            self.logger.warning('Database file exists.')
             return True
 
 

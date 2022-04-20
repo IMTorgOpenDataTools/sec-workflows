@@ -41,7 +41,6 @@ from _constants import (
     MINUTES_BETWEEN_CHECKS,
     QUARTERS_IN_TABLE,
     OUTPUT_REPORT_PATH,
-    accts,
     meta,
     filings,
     FilingMetadata
@@ -64,7 +63,7 @@ def main(args):
     logger.info(f'Starting process in {args.mode[0]} mode')
 
     #configure
-    ciks, tickers = load_firms(firms_file)
+    firms = load_firms(firms_file)
     db = Database(db_file = db_file,
                     table_name= table_name,
                     meta = meta,
@@ -80,7 +79,7 @@ def main(args):
     #process
     match args.mode[0]:
         case 'init':
-            updated = initialize_db(db, ciks, accts)
+            updated = initialize_db(db, firms)
             if updated: 
                 create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
                 logger.info(f'Database initialization complete')

@@ -16,6 +16,7 @@ import http
 
 from sec_edgar_downloader import Downloader
 from sec_edgar_downloader import UrlComponent as uc
+from sec_edgar_extractor.extract import Extractor
 
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
@@ -30,6 +31,7 @@ from _constants import (
     MINUTES_BETWEEN_CHECKS,
     QUARTERS_IN_TABLE,
     accts,
+    config,
     meta,
     filings,
     FilingMetadata
@@ -70,11 +72,15 @@ class TimeoutHTTPAdapter(HTTPAdapter):
 
 def load_firms(file_path):
     """Load file containing firms."""
+
     df = pd.read_csv(file_path)
-    firm_lst = df['CIK'].to_list()
-    cik_lst = [str(cik).zfill(10) for cik in firm_lst]
-    ticker_lst = df['Ticker'].to_list()
-    return cik_lst, ticker_lst
+    firm_recs = df.to_dict('records')
+    firms = []
+    for firm in firm_recs:
+        if firm:
+            item = uc.Firm(ticker = firm['Ticker'] )
+            firms.append( item )
+    return firms
 
 
  
@@ -90,19 +96,21 @@ def api_request(session, type, cik, acct):
         }
     url_firm_details = "https://data.sec.gov/submissions/CIK{}.json"
     url_company_concept = 'https://data.sec.gov/api/xbrl/companyconcept/CIK{}/us-gaap/{}.json'     #long_cik, acct
+
+    long_cik = make_long_cik(cik)
     match type:
         case 'firm_details': 
-            filled_url = url_firm_details.format(cik)
+            filled_url = url_firm_details.format(long_cik)
             keys = ('filings','recent')
         case 'concept': 
-            filled_url = url_company_concept.format(cik, acct)
+            filled_url = url_company_concept.format(long_cik, acct)
             keys = ('units','USD')
         case _:
             logger.warning(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
             exit()
+
     #make request
     edgar_resp = session.get(filled_url, headers=headers)
-    time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
     if edgar_resp.status_code == 200:
         if keys[0] in edgar_resp.json().keys():
             if keys[1] in edgar_resp.json()[keys[0]].keys():
@@ -164,14 +172,26 @@ def extract_accounts_from_documents(docs):
     pass
 
 
+def make_long_cik(cik):
+    short_cik = str(cik)
+    if len(short_cik) < 10:
+        zeros_to_add = 10 - len(short_cik)
+        long_cik = str(0) * zeros_to_add + str(short_cik)
+    else:
+        long_cik = short_cik
+    return long_cik
 
 
 
 
-def initialize_db(db, ciks, accts):
+
+def initialize_db(db, firms):
     """Initialize the database.
     """
     #request and populate records
+    extractor = Extractor(config=config,
+                            save_intermediate_files=True
+                            )
     with requests.Session() as client:
         client.mount("http://", TimeoutHTTPAdapter(max_retries=retries))
         client.mount("https://", TimeoutHTTPAdapter(max_retries=retries))
@@ -180,10 +200,12 @@ def initialize_db(db, ciks, accts):
             })
 
         recs = []
-        for cik in ciks:
-            for acct_key, acct_val in accts.items():
+        for firm in firms:
+            logger.info(f'get accounts for firm: {firm._name}')
+            accts = extractor.config[ firms[0]._ticker ].accounts.items()
+            for acct_key, acct_val in accts:
                 logger.info(f'api request for account: {acct_key}')
-                items = api_request(session=client, type='concept', cik=cik, acct=acct_key)
+                items = api_request(session=client, type='concept', cik=firm._cik, acct=acct_val.xbrl)      # if custom xbrl acct fails, then try default
                 if not items:
                     continue
                 items.reverse()
@@ -194,9 +216,9 @@ def initialize_db(db, ciks, accts):
                 tgt_items = items_dedup[idx_start:]
                 for item in tgt_items:
                     rec = FilingMetadata(
-                            cik = cik,
+                            cik = firm._cik,
                             accn = item['accn'],
-                            acct = acct_val,
+                            acct = acct_key,
                             val = item['val'],
                             fy = item['fy'],
                             fp = item['fp'],
@@ -205,6 +227,8 @@ def initialize_db(db, ciks, accts):
                             filed = item['filed']
                     )
                     recs.append( rec )
+                time.sleep(SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL)
+
     #prepare records and insert into db
     if len(recs) > 0:
         df = pd.DataFrame(recs, columns=FilingMetadata._fields)

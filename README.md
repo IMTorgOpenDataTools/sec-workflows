@@ -13,6 +13,9 @@ mv sec-edgar-downloader-feature-address_multiple_issues/ .lib/
 pipenv install .lib/sec-edgar-downloader-feature-address_multiple_issues/.
 pipenv install .
 python /workspaces/Prj-sec_workflows/sec_workflows/main.py init
+
+pipenv install .lib/sec-edgar-extractor-dev/.
+pipenv install -r .lib/sec-edgar-extractor-dev/requirements.txt 
 ```
 
 or 

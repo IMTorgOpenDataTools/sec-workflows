@@ -95,7 +95,7 @@ def load_config_account_info(file=None):
                     xbrl = tmp_rec['xbrl'],
                     table_name = tmp_rec['table_name'],
                     table_account = tmp_rec['table_title'],
-                    table_column = tmp_rec['table_column'],
+                    table_column = tmp_rec['col_idx'],
                     scale = tmp_rec['scale'],
                     discover_terms = get_default_if_missing(rec=tmp_rec, key='discover_terms'),
                     search_terms = get_default_if_missing(rec=tmp_rec, key='search_terms'),
@@ -119,12 +119,12 @@ def load_config_account_info(file=None):
 
 
 
-firms_file = './config/ciks.csv'
+firms_file = './config/ciks_test.csv'
 """"accounts_file = './config/accounts.csv'"""
 accounts_file = './config/Firm_Account_Info.csv'
 
 sec_edgar_downloads_path = './archive'
-log_file = './archive/example.log'
+log_file = './archive/process.log'
 db_file = './archive/test.db'
 #db_path = f'sqlite:///{db_file}'     #for testing: 'sqlite://'
 table_name = 'filings'

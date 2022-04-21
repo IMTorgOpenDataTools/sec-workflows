@@ -4,6 +4,7 @@ Module Docstring
 """
 from asyncio.log import logger
 import pandas as pd
+import numpy as np
 import sqlalchemy as sql
 from pathlib import Path
 import time
@@ -248,6 +249,153 @@ def initialize_db(db, firms):
             return False
         else:
             logger.info(f'Inserted {df_wide_total.shape[0]} records to table {db.table_name}')
+            return True
+    else:
+        return False
+
+
+
+
+
+def get_press_releases(db, firms):
+    """Get press releases (8-K/EX-99.*) and extract account values.
+    """
+
+    # supporting functions
+    def get_8k_qtr(df8k, df10q):
+        """Get the 8-K quarter by referencing the correspoding 10-Qs."""
+
+        periods = ['Q1','Q2','Q3','FY','Q1']            #index() will only take the first occurrence
+        quarters = {'Q1':1,'Q2':2,'Q3':3,'FY':4}
+
+        #prepare
+        df8k['dt_file_date'] = pd.to_datetime(df8k['filed'])
+        df10q['dt_filed'] = pd.to_datetime(df10q['filed'])
+        df8k.sort_values(by=['cik','dt_file_date'], inplace=True)
+        df10q.sort_values(by=['cik','dt_filed'], inplace=True)
+        df10q = df10q[df10q['form']!='8-K']
+        ciks10q = df10q['cik'].tolist()
+
+        #check each filing
+        results = []
+        for doc in df8k.to_dict('records'):
+            cik = doc['cik'] 
+            fd = doc['dt_file_date']
+            if cik in ciks10q:
+                dftmp = df10q[(df10q['cik'] == cik) & (df10q['dt_filed'] >= fd)]
+                if dftmp.shape[0] > 0:
+                    item = dftmp.iloc[0]['yr-qtr']
+                    results.append( item )
+                else:
+                    dftmp = df10q[(df10q['cik'] == cik) & (df10q['dt_filed'] < fd)].sort_values(by='dt_filed', ascending=False)
+                    last_record = dftmp.iloc[0]
+                    period = last_record['fp']
+                    idx = periods.index(period)
+                    new_period = periods[idx + 1]
+                    new_qtr = quarters[new_period]
+                    new_year = last_record['fy'] if period in periods[:2] else int(last_record['fy']) + 1
+                    item = f"{new_year}-{new_qtr}"
+                    results.append( item )
+            else: results.append( None )
+        return results
+
+
+    def create_qtr(row):
+        """Create the column formatted `yr-qtr`."""
+        if row['fp']=='FY': 
+            fp = 4
+        else:
+            fp = str(row['fp']).replace('Q','')
+        return str(row['fy']) + '-' + str(fp)
+
+
+    def check(row):
+        """Mask for selecting press release data."""
+        if type(row.Type) == str and ('EX-99.1' in row.Type or 'EX-99.2' in row.Type or 'EX-99.3' in row.Type):
+            return True
+        else:
+            return False
+
+
+
+    path_download = "./archive/downloads"
+
+    # download
+    ciks = [str(firm._cik) for firm in firms]
+    dl = Downloader(path_download)
+    for firm in firms:
+        TICKER = firm.get_info()['ticker']
+        urls = dl.get_urls("8-K",
+                            TICKER, 
+                            after="2021-01-01")   
+    df = dl.filing_storage.get_dataframe(mode='document')
+    sel1 = df[(df['short_cik'].isin(ciks)) & (df['file_type'] == '8-K') & (df['FS_Location'] == '')]
+    mask = sel1.apply(check, axis=1)
+    sel2 = sel1[mask]
+    sel2.shape
+    lst_of_idx = sel2.index.tolist()
+    staged = dl.filing_storage.get_document_in_record( lst_of_idx )
+    updated_docs = dl.get_documents_from_url_list(staged)
+
+    # extract
+    extractor = Extractor(config = config,
+                    save_intermediate_files = True
+                    )
+    recs = []
+    for doc in updated_docs:
+        cik = doc.FS_Location.parent.parent.parent.name
+        target_firm = [firm for firm in firms if firm.get_info()['cik'].__str__()==cik][0]
+        ticker = target_firm.get_info()['ticker']
+        items = extractor.execute_extract_process(doc=doc, ticker=ticker)
+        items_key = list(items.keys())[0]
+        doc_meta = sel2[sel2.Document == doc.Document].to_dict('record')[0]
+        for acct, val in items[items_key].items():
+            rec = FilingMetadata(
+                            cik = str(doc_meta['short_cik']),
+                            accn = str(doc_meta['accession_number']),
+                            acct = acct,
+                            val = val,
+                            fy = np.nan,
+                            fp = np.nan,
+                            form = f"{doc_meta['file_type']}/{doc.Type}",
+                            end = np.nan,
+                            filed = doc_meta['file_date']
+                    )
+            recs.append(rec)
+
+    # prepare table
+    if len(recs) > 0:
+        df = pd.DataFrame(recs, columns=FilingMetadata._fields)
+        df_columns = df.drop(labels=['acct','val'], axis=1).drop_duplicates(subset=['cik','accn'])
+        df_wide = df.pivot(index=['cik','accn'], columns='acct', values='val').reset_index()
+        df_wide_total = pd.merge(df_wide, df_columns, on=['cik','accn'], how='left')
+        df_wide_total['filed'] = pd.to_datetime(df_wide_total['filed'])
+        df_wide_total.sort_values(by='filed', ascending=False, inplace=True)
+        df_8k = df_wide_total.copy(deep=True)
+
+        df_10q = pd.read_sql(db.table_name, con=db.engine)
+        table_cols = df_10q.columns.to_list()
+        df_10q['yr-qtr'] = df_10q.apply(create_qtr, axis=1)
+        df_10q['short_cik'] = df_10q['cik'].astype(str)
+        df_8k['yr-qtr'] = get_8k_qtr(df_8k, df_10q)
+        df_8k['fy'] = df_8k['yr-qtr'].str.split(pat='-').str[0]
+        df_8k['fp'] = df_8k['yr-qtr'].str.split(pat='-').str[1].replace({'1':'Q1','2':'Q2','3':'Q3','4':'FY'})
+        current_cols = df_8k.columns
+        select_cols = [col for col in current_cols if col in table_cols]
+        df_to_commit = df_8k[select_cols]
+
+    # load into db
+        try:
+            df_to_commit.to_sql(db.table_name, 
+                    con=db.engine,
+                    if_exists='append', 
+                    index=False
+                    )
+        except sql.exc.IntegrityError as e:
+            logger.warning('Unique key violation on insert')
+            return False
+        else:
+            logger.info(f'Inserted {df_8k.shape[0]} records to table {db.table_name}')
             return True
     else:
         return False

@@ -15,6 +15,7 @@ from sqlalchemy import Table, Column, Integer, String, MetaData
 import sqlalchemy_utils as sql_util         #database_exists, create_database
 
 #built-in
+import os
 from pathlib import Path
 import logging
 import time
@@ -29,6 +30,7 @@ from utils import (
     poll_sec_edgar,
     initialize_db,
     create_report,
+    get_press_releases
 )
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
@@ -48,6 +50,7 @@ from _constants import (
 
 
 #configure
+#Path(log_file).mkdir(parents=True, exist_ok=True)
 logging.basicConfig(filename=log_file, encoding='utf-8', level=logging.INFO, format='%(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -79,8 +82,9 @@ def main(args):
     #process
     match args.mode[0]:
         case 'init':
-            updated = initialize_db(db, firms)
-            if updated: 
+            api = initialize_db(db, firms)
+            scrape = get_press_releases(db, firms)
+            if api and scrape: 
                 create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
                 logger.info(f'Database initialization complete')
             else:

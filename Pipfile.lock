@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "636e5da1445679d90a68d45c03a0bb0695a534777d02bffa4f5f5e57c30a61a9"
+            "sha256": "fc62d2d628ecd9c16b94fe1060c1715dfdd5cc42c64e784851281f028dbbf213"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -732,8 +732,8 @@
             "version": "==4.3.0"
         },
         "sec-edgar-extractor": {
-            "path": "./.lib/sec-edgar-extractor-dev",
-            "version": "==0.1.0"
+            "editable": true,
+            "path": "./.lib/sec-edgar-extractor-dev"
         },
         "six": {
             "hashes": [

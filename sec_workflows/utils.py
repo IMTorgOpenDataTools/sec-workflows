@@ -183,11 +183,23 @@ def make_long_cik(cik):
     return long_cik
 
 
+def scale_value(val, scale):
+    match scale:
+        case 'millions':
+            result_val = val / 1000000
+        case 'billions':
+            result_val = val / 1000000000
+        case _:
+            result_val = val
+    return result_val
+
 
 
 
 def initialize_db(db, firms):
     """Initialize the database.
+
+    TODO: scale values by config units (usually millions)
     """
     #request and populate records
     extractor = Extractor(config=config,
@@ -220,7 +232,7 @@ def initialize_db(db, firms):
                             cik = firm._cik,
                             accn = item['accn'],
                             acct = acct_key,
-                            val = item['val'],
+                            val = scale_value(item['val'], acct_val.scale),
                             fy = item['fy'],
                             fp = item['fp'],
                             form = item['form'],

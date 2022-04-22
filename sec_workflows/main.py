@@ -91,7 +91,7 @@ def main(args):
                 logger.info(f'No databae update necessary')
         case 'run':
             while True:
-                changed_data = poll_sec_edgar(db, ciks)
+                changed_data = poll_sec_edgar(db, ciks)     #TODO: update with with firms
                 if changed_data:
                     print("sec edgar changed")
                     db.update_database()

@@ -39,8 +39,6 @@ Flask-RESTful = "==0.3.9"
 Jinja2 = "==3.0.3"
 MarkupSafe = "==2.1.1"
 Werkzeug = "==2.0.3"
-sec-edgar-downloader = {path = "./.lib/sec-edgar-downloader-feature-address_multiple_issues"}
-sec-edgar-extractor = {editable = true, path = "./.lib/sec-edgar-extractor-dev"}
 pdfkit = "==1.0.0"
 py3-wkhtmltopdf = "==0.4.1"
 camelot-py = "==0.9.0"
@@ -56,6 +54,9 @@ tabulate = "==0.8.9"
 wkhtmltopdf = "==0.2"
 uTidylib = "==0.8"
 PyPDF2 = "==1.26.0"
+sec-edgar-downloader = {path = "./.lib/sec-edgar-downloader"}
+sec-edgar-extractor = {path = "./.lib/sec-edgar-extractor"}
+plotnine = "*"
 
 [dev-packages]
 

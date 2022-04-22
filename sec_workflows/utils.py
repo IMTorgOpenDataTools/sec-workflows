@@ -6,6 +6,8 @@ from asyncio.log import logger
 import pandas as pd
 import numpy as np
 import sqlalchemy as sql
+import plotnine as p9
+
 from pathlib import Path
 import time
 from datetime import date, timedelta
@@ -215,7 +217,9 @@ def initialize_db(db, firms):
         recs = []
         for firm in firms:
             logger.info(f'get accounts for firm: {firm._name}')
-            accts = extractor.config[ firms[0]._ticker ].accounts.items()
+            if not firm._ticker in extractor.config.keys():
+                continue
+            accts = extractor.config[ firm._ticker ].accounts.items()
             for acct_key, acct_val in accts:
                 logger.info(f'api request for account: {acct_key}')
                 items = api_request(session=client, type='concept', cik=firm._cik, acct=acct_val.xbrl)      # if custom xbrl acct fails, then try default
@@ -355,7 +359,7 @@ def get_press_releases(db, firms):
                     )
     recs = []
     for doc in updated_docs:
-        cik = doc.FS_Location.parent.parent.parent.name
+        cik = doc.FS_Location.parent.parent.name             #TODO:<<<fix this craziness by creating a class and providing attributes: cik, accn
         target_firm = [firm for firm in firms if firm.get_info()['cik'].__str__()==cik][0]
         ticker = target_firm.get_info()['ticker']
         items = extractor.execute_extract_process(doc=doc, ticker=ticker)
@@ -458,18 +462,55 @@ def poll_sec_edgar(db, ciks):
 def create_report(report_type, db, output_path):
     """Create the final report from db query."""
 
-    def report_long(output_path):
+    def report_long(output_path=False):
         df = db.query_database()
-        if df.shape[0] > 0:
+        if df.shape[0] > 0 and output_path:
             df.to_csv(output_path, index=False)
             logger.info(f'Report saved to path: {output_path}')
         else:
             logger.info(f'No data available to report')
-        return None
+        return df
 
 
+    def template(df_long, dir_path=False):
+        plt = p9.ggplot(data=df_long,
+                        mapping=p9.aes(x='filed',
+                        y='ACL',
+                        color='cik')
+                        ) + p9.geom_line()
+        plt_file_path = dir_path / 'trend.png'
+        plt.save(filename = plt_file_path, height=3, width=5, units = 'in', dpi=1000)
+        page_title_text = '<placeholder>'
+        title_text = '<placeholder>'
+        text = '<placeholder>'
+        html = f'''
+            <html>
+                <head>
+                    <title>{page_title_text}</title>
+                </head>
+                <body>
+                    <h1>{title_text}</h1>
+                    <p>{text}</p>
+                    <img src={plt_file_path} width="700">
+                    <p>{text}</p>
+                    {df_long.to_html()}
+                </body>
+            </html>
+            '''
+        file_path = dir_path / 'trend_report.html'
+        with open(file_path, 'w') as f:
+            f.write(html)
+        return True
+        
+    dir_path = Path(output_path).parent
     match report_type:
-        case 'long': report_long(output_path)
-        case 'wide': pass
+        case 'long': 
+            result = report_long(output_path)
+        case 'wide': 
+            pass
+        case 'trend':
+            df_long = report_long()
+            result = template(df_long, dir_path)
 
-    return None
+
+    return result

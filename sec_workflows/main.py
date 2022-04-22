@@ -102,6 +102,9 @@ def main(args):
                     print("no change to server")
                 secs = MINUTES_BETWEEN_CHECKS * 60
                 time.sleep(secs)
+        case 'report':
+            create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
+            create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
 
     logger.info(f'Process exited')
                     
@@ -123,7 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("mode",
                         default='init',
                         nargs=1,
-                        choices=['init', 'run'], 
+                        choices=['init', 'run', 'report'], 
                         help="`init`ialize or `run` the process"
                         )
     args = parser.parse_args()

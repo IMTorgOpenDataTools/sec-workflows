@@ -1,8 +1,8 @@
 ticker,name,xbrl,verify_xbrl,table_name,table_title,table_column,col_idx,scale,discover_terms,search_terms,exhibits,page_no
-TFC,ACL,FinancingReceivableAllowanceForCreditLosses,Not in API,Allowance for Credit Losses,Ending balance,<left-most>,0,millions,NA,NA,EX-99.2,14
+TFC,ACL,NA,Not in API,Allowance for Credit Losses,Ending balance,<left-most>,0,millions,NA,NA,EX-99.2,14
 TFC,ALLL,AllowanceForLoanAndLeaseLossesWriteOffs,In API,Consolidated Ending Balance Sheets - Five Quarter Trend,Allowance for loan and lease losses,<left-most>,0,millions,NA,NA,EX-99.2,7
 TFC,PCL,ProvisionForLoanLeaseAndOtherLosses,In API,Financial Highlights,Provision for credit losses,<left-most>,3,millions,NA,NA,EX-99.2,14
-TFC,ChargeOffs,AllowanceForLoanAndLeaseLossesWriteOffs,In API,Allowance for Credit Losses,Net charge-offs,<left-most>,0,millions,NA,NA,EX-99.2,14
+TFC,ChargeOffs,NA,In API,Allowance for Credit Losses,Net charge-offs,<left-most>,0,millions,NA,NA,EX-99.2,14
 TFC,NetChargeOffs,NA,Not in Report of API,NA,NA,NA,NA,millions,NA,NA,NA,NA
 TFC,Loans,LoansAndLeasesReceivableNetOfDeferredIncome,In API - default is also,Consolidated Ending Balance Sheets - Five Quarter Trend,Total loans and leases,<left-most>,0,millions,NA,NA,EX-99.2,7
 TFC,ALLLpctLHFI,NA,NA,Financial Highlights - Five Quarter Trend,Allowance for loan and lease losses as a percentage of LHFI,<left-most>,0,NA,NA,NA,EX-99.2,4
@@ -24,33 +24,34 @@ WFC,TotalChargeOffs,AllowanceForLoanAndLeaseLossesWriteOffs,In API,,,,NA,million
 WFC,NetChargeOffs,AllowanceForLoanAndLeaseLossesWriteoffsNet,In API,CHANGES IN ALLOWANCE FOR CREDIT LOSSES FOR LOANS,Net loan charge-offs,"Year ended <MON> <DAY>, / <YYYY>",0,millions,NA,NA,EX-99.2,NA
 WFC,Loans,NotesReceivableGross,In API,CONSOLIDATED BALANCE SHEET,Loans,<left-most>,0,millions,NA,NA,EX-99.2,NA
 WFC,ACLpctLoan,srt:FinancingReceivableAllowanceForCreditLossToOutstandingPercent,In API,CHANGES IN ALLOWANCE FOR CREDIT LOSSES FOR LOANS,Allowance for credit losses for loans as a percentage of: / Total loans,"Year ended <MON> <DAY>, / <YYYY>",0,NA,NA,NA,EX-99.2,NA
-ALLY,ACL,NA,NA,,NA,<left-most>,0,millions,NA,NA,EX-99.3,NA
+ALLY,ACL,FinancingReceivableAllowanceForCreditLosses,NA,,NA,<left-most>,0,millions,NA,NA,EX-99.3,NA
 ALLY,ALLL,FinancingReceivableAllowanceForCreditLossExcludingAccruedInterest,NA,CONSOLIDATED FINANCIAL HIGHLIGHTS,Allowance for loans losses,<left-most>,0,millions,NA,NA,EX-99.3,NA
 ALLY,PCL,ProvisionForLoanLossesExpensed,NA,CONSOLIDATED INCOME STATEMENT,Provision for credit losses,<left-most>,7,millions,NA,NA,EX-99.3,NA
 ALLY,ChargeOffs,FinancingReceivableAllowanceForCreditLossWriteOffAfterRecovery,NA,CREDIT RELATED INFORMATION,Net charge-offs,<left-most>,7,millions,NA,NA,EX-99.3,NA
 ALLY,Loans,FinancingReceivableExcludingAccruedInterestAfterAllowanceForCreditLoss,NA,CONSOLIDATED PERIOD-END BALANCE SHEET,"Total finance receivables and loans, net",<left-most>,0,millions,NA,NA,EX-99.3,NA
-ALLY,ACLpctLoan,NA,NA,NA,NA,<left-most>,0,NA,NA,NA,EX-99.3,NA
-ALLY,ALLLpctLoan,NA,NA,CREDIT RELATED INFORMATION,ALLL as % of Loans,<left-most>,0,NA,NA,NA,NA,NA
-GS,ACL,gs:AllowanceForLossesOnLoansAndLendingCommitments,NA,NA,NA,<left-most>,0,millions,NA,NA,NA,NA
-GS,PCL,ProvisionForLoanLeaseAndOtherLosses,NA,Consolidated Statements of Earnings,Provision for credit losses,<left-most>,0,millions,NA,NA,EX-99.1,NA
-GS,ChargeOffs,AllowanceForLoanAndLeaseLossesWriteOffs,NA,NA,Net charge-offs,<left-most>,0,millions,NA,NA,NA,NA
-GS,Loans,NotesReceivableGross,NA,Condensed Consolidated Balance Sheets,Loans,<left-most>,0,billions,NA,NA,EX-99.1,NA
-GS,ACLpctLoan,NA,NA,NA,NA,<left-most>,0,NA,NA,NA,NA,NA
-JPM,ACL,FinancingReceivableAllowanceForCreditLosses,NA,Credit-Related Information,Total allowance for credit losses,<left-most>,0,millions,NA,NA,EX-99.2,NA
-JPM,ALLL,FinancingReceivableAllowanceForCreditLossExcludingAccruedInterest,NA,Credit-Related Information,Total allowance for loan losses,<left-most>,0,millions,NA,NA,EX-99.2,NA
-JPM,PCL,ProvisionForLoanLeaseAndOtherLosses,NA,CONSOLIDATED STATEMENTS OF INCOME,Provision for credit losses,FULL Year / 2021,0,millions,NA,NA,EX-99.2,NA
-JPM,ChargeOffs,FinancingReceivableAllowanceForCreditLossWriteOffAfterRecovery,NA,Credit-Related Information,Net charge-offs,FULL Year / 2021,0,millions,NA,NA,EX-99.2,NA
-JPM,Loans,jpm:FinancingReceivableExcludingAccruedInterestBeforeAllowanceForCreditLossesNetOfDeferredIncome,NA,Credit-Related Information,Total loans,<left-most>,0,millions,NA,NA,EX-99.2,NA
-JPM,ACLpctLoan,NA,NA,Credit-Related Information,Total allowance to total retained loans,<left-most>,0,NA,NA,NA,EX-99.2,NA
-C,ACL,NA,NA,CITIGROUP CONSOLIDATED BALANCE SHEET,Allowance for credit losses on loans (ACLL),<left-most>,4,millions,NA,NA,EX-99.2,NA
-C,ALLL,NA,NA,NA,NA,<left-most>,0,millions,NA,NA,EX-99.2,NA
-C,PCL,NA,NA,ALLOWANCE FOR CREDIT LOSSES ON LOANS AND UNFUNDED LENDING COMMITMENTS,Provision for credit losses on loans (PCLL),FY / Year / 2021,9,millions,NA,NA,EX-99.2,NA
-C,ChargeOffs,NA,NA,NA,NA,<left-most>,0,millions,NA,NA,EX-99.2,NA
-C,Loans,NA,NA,CITIGROUP CONSOLIDATED BALANCE SHEET,"Total loans, net",<left-most>,4,millions,NA,NA,EX-99.2,NA
-C,ACLpctLoan,NA,NA,ALLOWANCE FOR CREDIT LOSSES ON LOANS AND UNFUNDED LENDING COMMITMENTS,Total ACLL as a percentage of total loans,4Q / 2021,4,NA,NA,NA,EX-99.2,NA
-CFG,ACL,NA,NA,Credit quality review,Allowance for credit losses,<left-most>,0,millions,NA,NA,EX-99.1,NA
-CFG,ALLL,NA,NA,NA,NA,<left-most>,0,millions,NA,NA,EX-99.1,NA
-CFG,PCL,NA,NA,Credit quality review,Provision for credit losses,<left-most>,0,millions,NA,NA,EX-99.1,NA
-CFG,ChargeOffs,NA,NA,Credit quality review,Net charge-offs,<left-most>,0,millions,NA,NA,EX-99.1,NA
-CFG,Loans,NA,NA,Interest-earning assets,Total loans and leases,<left-most>,0,millions,NA,NA,EX-99.1,NA
-CFG,ACLpctLoan,NA,NA,Credit quality review,Allowance for credit losses to loans and leases,<left-most>,0,NA,NA,NA,EX-99.1,NA
+ALLY,ACLpctLoan,NA,Not in API,NA,NA,<left-most>,0,NA,NA,NA,EX-99.3,NA
+ALLY,ALLLpctLoan,NA,Not in API,CREDIT RELATED INFORMATION,ALLL as % of Loans,<left-most>,0,NA,NA,NA,NA,NA
+GS,ACL,gs:AllowanceForLossesOnLoansAndLendingCommitments,In API,NA,NA,<left-most>,0,millions,NA,NA,NA,NA
+GS,ALLL,AllowanceForLoanAndLeaseLossesWriteOffs,In API,NA,NA,NA,NA,NA,NA,NA,NA,NA
+GS,PCL,ProvisionForLoanLeaseAndOtherLosses,In API,Consolidated Statements of Earnings,Provision for credit losses,<left-most>,0,millions,NA,NA,EX-99.1,NA
+GS,ChargeOffs,AllowanceForLoanAndLeaseLossesWriteOffs,In API,NA,Net charge-offs,<left-most>,0,millions,NA,NA,NA,NA
+GS,Loans,NotesReceivableGross,In API,Condensed Consolidated Balance Sheets,Loans,<left-most>,0,billions,NA,NA,EX-99.1,NA
+GS,ACLpctLoan,NA,Not in API,NA,NA,<left-most>,0,NA,NA,NA,NA,NA
+JPM,ACL,FinancingReceivableAllowanceForCreditLosses,In API,Credit-Related Information,Total allowance for credit losses,<left-most>,0,millions,NA,NA,EX-99.2,NA
+JPM,ALLL,FinancingReceivableAllowanceForCreditLossExcludingAccruedInterest,In API,Credit-Related Information,Total allowance for loan losses,<left-most>,0,millions,NA,NA,EX-99.2,NA
+JPM,PCL,ProvisionForLoanLeaseAndOtherLosses,In API,CONSOLIDATED STATEMENTS OF INCOME,Provision for credit losses,FULL Year / 2021,0,millions,NA,NA,EX-99.2,NA
+JPM,ChargeOffs,FinancingReceivableAllowanceForCreditLossWriteOffAfterRecovery,In API,Credit-Related Information,Net charge-offs,FULL Year / 2021,0,millions,NA,NA,EX-99.2,NA
+JPM,Loans,jpm:FinancingReceivableExcludingAccruedInterestBeforeAllowanceForCreditLossesNetOfDeferredIncome,In API,Credit-Related Information,Total loans,<left-most>,0,millions,NA,NA,EX-99.2,NA
+JPM,ACLpctLoan,NA,Not in API,Credit-Related Information,Total allowance to total retained loans,<left-most>,0,NA,NA,NA,EX-99.2,NA
+C,ACL,FinancingReceivableAllowanceForCreditLosses,In API,CITIGROUP CONSOLIDATED BALANCE SHEET,Allowance for credit losses on loans (ACLL),<left-most>,4,millions,NA,NA,EX-99.2,NA
+C,ALLL,AllowanceForLoanAndLeaseLossesWriteOffs,In API,NA,NA,<left-most>,0,millions,NA,NA,EX-99.2,NA
+C,PCL,ProvisionForLoanLeaseAndOtherLosses,In API,ALLOWANCE FOR CREDIT LOSSES ON LOANS AND UNFUNDED LENDING COMMITMENTS,Provision for credit losses on loans (PCLL),FY / Year / 2021,9,millions,NA,NA,EX-99.2,NA
+C,TotalChargeOffs,FinancingReceivableAllowanceForCreditLossesWriteOffs,In API,NA,NA,<left-most>,0,millions,NA,NA,EX-99.2,NA
+C,Loans,NotesReceivableGross,In API,CITIGROUP CONSOLIDATED BALANCE SHEET,"Total loans, net",<left-most>,4,millions,NA,NA,EX-99.2,NA
+C,ACLpctLoan,NA,Not in API,ALLOWANCE FOR CREDIT LOSSES ON LOANS AND UNFUNDED LENDING COMMITMENTS,Total ACLL as a percentage of total loans,4Q / 2021,4,NA,NA,NA,EX-99.2,NA
+CFG,ACL,FinancingReceivableAllowanceForCreditLosses,In API,Credit quality review,Allowance for credit losses,<left-most>,0,millions,NA,NA,EX-99.1,NA
+CFG,ALLL,NA,Not in API,NA,NA,<left-most>,0,millions,NA,NA,EX-99.1,NA
+CFG,PCL,ProvisionForLoanLeaseAndOtherLosses,In API,Credit quality review,Provision for credit losses,<left-most>,0,millions,NA,NA,EX-99.1,NA
+CFG,ChargeOffs,NA,Not in API,Credit quality review,Net charge-offs,<left-most>,0,millions,NA,NA,EX-99.1,NA
+CFG,Loans,NotesReceivableGross,In API,Interest-earning assets,Total loans and leases,<left-most>,0,millions,NA,NA,EX-99.1,NA
+CFG,ACLpctLoan,NA,Not in API,Credit quality review,Allowance for credit losses to loans and leases,<left-most>,0,NA,NA,NA,EX-99.1,NA

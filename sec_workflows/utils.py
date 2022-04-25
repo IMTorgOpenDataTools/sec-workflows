@@ -6,11 +6,16 @@ from asyncio.log import logger
 import pandas as pd
 import numpy as np
 import sqlalchemy as sql
-import plotnine as p9
+from plotnine import *
+from mizani.breaks import date_breaks
+from mizani.formatters import date_format
 
 from pathlib import Path
 import time
 from datetime import date, timedelta
+
+import pdfkit
+import base64
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -464,6 +469,8 @@ def create_report(report_type, db, output_path):
 
     def report_long(output_path=False):
         df = db.query_database()
+        df['dt_filed'] = pd.to_datetime(df.filed)
+        df.sort_values(by=['cik','dt_filed'], inplace=True, ascending=False)
         if df.shape[0] > 0 and output_path:
             df.to_csv(output_path, index=False)
             logger.info(f'Report saved to path: {output_path}')
@@ -473,14 +480,23 @@ def create_report(report_type, db, output_path):
 
 
     def template(df_long, dir_path=False):
-        plt = p9.ggplot(data=df_long,
-                        mapping=p9.aes(x='filed',
-                        y='ACL',
-                        color='cik')
-                        ) + p9.geom_line()
-        plt_file_path = dir_path / 'trend.png'
-        plt.save(filename = plt_file_path, height=3, width=5, units = 'in', dpi=1000)
-        page_title_text = '<placeholder>'
+        plt = (ggplot(aes(x='dt_filed', y='ACL'), df_long) 
+                + geom_point(aes(color='cik'), alpha=0.7)
+                + geom_line(aes(color='cik')) 
+                + scale_x_datetime(labels=date_format('%Y-%m')) 
+                + scale_y_log10()
+                + labs(y='log Allowance for credit losses', 
+                        x='Date', 
+                        title="Firms' Allowance for Credit Losses over Time")
+                + theme(figure_size=(12, 6))
+                )
+        plt_file_path = dir_path / 'trend.jpg'
+        plt.save(filename = plt_file_path, height=3, width=9, units = 'in', dpi=250)
+        with open(plt_file_path, 'rb') as f:
+            b64 = base64.b64encode( f.read() )
+        b64_string = b64.decode('ascii')
+        image_src = '"data:image/jpg;base64, ' + b64_string + '"'
+        page_title_text = 'ACL Trend Report'
         title_text = '<placeholder>'
         text = '<placeholder>'
         html = f'''
@@ -491,7 +507,7 @@ def create_report(report_type, db, output_path):
                 <body>
                     <h1>{title_text}</h1>
                     <p>{text}</p>
-                    <img src={plt_file_path} width="700">
+                    <img src={image_src} width="1200">
                     <p>{text}</p>
                     {df_long.to_html()}
                 </body>
@@ -500,8 +516,16 @@ def create_report(report_type, db, output_path):
         file_path = dir_path / 'trend_report.html'
         with open(file_path, 'w') as f:
             f.write(html)
+        options = {
+            "enable-local-file-access": True
+            }
+        try:
+            pdfkit.from_file(str(file_path), './archive/out.pdf')
+        except:
+            pass
         return True
         
+
     dir_path = Path(output_path).parent
     match report_type:
         case 'long': 

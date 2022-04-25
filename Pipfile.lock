@@ -218,6 +218,7 @@
             "version": "==0.3.9"
         },
         "fonttools": {
+            "extras": [],
             "hashes": [
                 "sha256:696fe922a271584c3ec8325ba31d4001a4fd6c4953b22900b767f1cb53ce1044",
                 "sha256:b4da40696829845ea8c1cb33ce51c552179754cbee7ab4e8b96a6bcf421f437a"

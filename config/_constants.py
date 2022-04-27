@@ -131,7 +131,7 @@ table_name = 'filings'
 
 MINUTES_BETWEEN_CHECKS = 0.10
 QUARTERS_IN_TABLE = 6
-OUTPUT_REPORT_PATH = './archive/output.csv'
+OUTPUT_REPORT_PATH = './archive/report/long_output.csv'
 
 """"accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"""
 config = load_config_account_info(file=accounts_file)

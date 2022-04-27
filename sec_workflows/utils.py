@@ -513,19 +513,34 @@ def create_report(report_type, db, output_path):
                 </body>
             </html>
             '''
-        file_path = dir_path / 'trend_report.html'
+        file_path = dir_path / 'report_trend.html'
         with open(file_path, 'w') as f:
             f.write(html)
         options = {
             "enable-local-file-access": True
             }
         try:
-            pdfkit.from_file(str(file_path), './archive/out.pdf')
+            pdfkit.from_file(str(file_path), './archive/report/report_trend.pdf')
         except:
             pass
         return True
-        
 
+
+    def validate(df_long, dir_path=False):
+        df_qtrly = df_long[df_long['form'].isin(['10-K','10-Q'])]
+        df_8k = df_long[~df_long['form'].isin(['10-K','10-Q'])]
+        df_tmp = pd.merge(df_qtrly, df_8k, on=['fy','fp','cik'], how='left')
+        for acct in accts:
+            left = acct+'_x'
+            right = acct+'_y'
+            df_tmp[acct+'_diff'] = df_tmp[left] - df_tmp[right]
+            #df_tmp.drop(columns=[left, right], inplace=True)
+        df_valid = df_tmp
+        file_path = dir_path / 'report_validation.csv'
+        df_valid.to_csv(file_path, index=False)
+        return True
+
+        
     dir_path = Path(output_path).parent
     match report_type:
         case 'long': 
@@ -535,6 +550,9 @@ def create_report(report_type, db, output_path):
         case 'trend':
             df_long = report_long()
             result = template(df_long, dir_path)
+        case 'validate':
+            df_long = report_long()
+            result = validate(df_long, dir_path)
 
 
     return result

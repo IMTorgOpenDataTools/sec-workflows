@@ -105,6 +105,7 @@ def main(args):
         case 'report':
             create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
             create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
+            create_report(report_type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
 
     logger.info(f'Process exited')
                     

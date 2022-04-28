@@ -3,6 +3,7 @@
 Module Docstring
 """
 from asyncio.log import logger
+from enum import unique
 import pandas as pd
 import numpy as np
 import sqlalchemy as sql
@@ -12,7 +13,7 @@ from mizani.formatters import date_format
 
 from pathlib import Path
 import time
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 
 import pdfkit
 import base64
@@ -375,7 +376,7 @@ def get_press_releases(db, firms):
                             cik = str(doc_meta['short_cik']),
                             accn = str(doc_meta['accession_number']),
                             acct = acct,
-                            val = val,
+                            val = np.abs(val),
                             fy = np.nan,
                             fp = np.nan,
                             form = f"{doc_meta['file_type']}/{doc.Type}",
@@ -462,6 +463,15 @@ def poll_sec_edgar(db, ciks):
     return False
     '''
 
+def create_qtr(row):
+    """Create the column formatted `yr-qtr`."""
+    if row['fp']=='FY': 
+        fp = 4
+    else:
+        fp = str(row['fp']).replace('Q','')
+    return str(row['fy']) + '-' + str(fp)
+
+
 
 
 def create_report(report_type, db, output_path):
@@ -477,6 +487,30 @@ def create_report(report_type, db, output_path):
         else:
             logger.info(f'No data available to report')
         return df
+
+
+    def report_accounting(df_long, output_path=False):
+        days_from_last_qtr = [0, 90, 180]
+        df_result = pd.DataFrame()
+        df_result['cik'] = df_long['cik'].unique()
+        df_result.set_index('cik', inplace=True)
+        dfs = {}
+        for days in days_from_last_qtr:
+            prev = pd.Timestamp(datetime.now())  -  pd.to_timedelta( days, unit='d')
+            prev_qtr = f'{prev.year}-{prev.quarter}'
+            df_long['yr-qtr'] = df_long.apply(create_qtr, axis=1)
+            qtrly = ['10-K','10-Q']
+            mask = ~df_long['form'].isin( qtrly ) if days == 90 else df_long['form'].isin( qtrly )
+            df_qtr = df_long[ (df_long['yr-qtr'] == prev_qtr) & (mask)]
+            # df_long[ (df_long['yr-qtr'] == '2021-4') & (~df_long['form'].isin( qtrly ))]
+            df_qtr.drop_duplicates(subset=['cik'], inplace=True)
+            df_qtr.set_index('cik', inplace=True)
+            dfs[prev_qtr] = df_qtr
+        for key in dfs.keys():
+            if dfs[key].shape[0] > 0:
+                df_result = df_result.join(dfs[key]['ACL'], how='outer') 
+                df_result.rename(columns={'ACL':'ACL'+'|'+key}, inplace=True)
+        pass
 
 
     def template(df_long, dir_path=False):
@@ -545,8 +579,9 @@ def create_report(report_type, db, output_path):
     match report_type:
         case 'long': 
             result = report_long(output_path)
-        case 'wide': 
-            pass
+        case 'accounting_policy':
+            df_long = report_long() 
+            result = report_accounting(df_long, dir_path)
         case 'trend':
             df_long = report_long()
             result = template(df_long, dir_path)
@@ -554,5 +589,29 @@ def create_report(report_type, db, output_path):
             df_long = report_long()
             result = validate(df_long, dir_path)
 
-
     return result
+
+
+def reset_files(mode='intermediate_files'):
+    """Remove specific files from the `downloades` directory.
+    'intermediate_files' - created during extraction process
+    'directory_structure' - all files, dirs created during download and extraction process
+    """
+    match mode:
+        case 'intermediate_files':
+            dir_path = './archive/downloads/sec-edgar-filings'
+            acct_names = ['ACL', 'ALLL', 'PCL', 'Loans', 'ChargeOffs', 'ACLpctLoan', 'Charge Offs', 'ACLpct Loan']
+            #subdirs = os.listdirs(dir_path)
+            #docdirs = [os.listdirs(dir) for dir in subdirs]
+            #docfiles = [os.list(docdir) for docdir in docdirs]
+            p = Path(dir_path)
+            files = list(p.glob('**/*'))
+            files_to_del = []
+            for file in files:
+                if not hasattr(file, 'stem'): continue
+                if file.stem in acct_names:
+                    files_to_del.append(file)
+            [file.unlink() for file in files_to_del]
+            return True
+        case 'directory_structure':
+            pass

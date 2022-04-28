@@ -27,6 +27,14 @@
             "program": "${workspaceFolder}/sec_workflows/main.py",
             "args": ["report"],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "PythonCLI: RESET",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/sec_workflows/main.py",
+            "args": ["RESET_FILES"],
+            "console": "integratedTerminal"
         }
     ]
 }

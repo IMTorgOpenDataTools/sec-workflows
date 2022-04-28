@@ -1,16 +1,11 @@
 Name,Ticker,CIK
 US Bankcorp,USB,36104
 American Express Company,AXP,4962
-Baco Santandar,SAN,891478
-Bank of Montreal,BMO,927971
 Capital One Financial Corporation,COF,927628
 Fifth Third Bancorp,FITB,35527
-HSBC Holdings PLC,HSBC,1089113
 Huntington Bancshares Incorporated,HBAN,49196
 Keycorp,KEY,91576
 Morgan Stanley,MS,895421
-Royal Bank of Canada,RY,1000275
-Toronto-Dominion Bank,TD,947263
 JPMorgan Chase,JPM,19617
 Citigroup Inc,C,831001
 Wells Fargo,WFC,72971
@@ -20,5 +15,4 @@ Goldman Sachs,GS,886982
 Truist Financial Corporation,TFC,92230
 Ally Financial Inc,ALLY,40729
 Citizens Financial Group,CFG,759944
-City National Bank,CYN,275216
 BankUnited,BKU,1504008

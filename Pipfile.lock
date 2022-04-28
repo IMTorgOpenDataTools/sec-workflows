@@ -195,11 +195,11 @@
         },
         "faker": {
             "hashes": [
-                "sha256:2a9716f2c409224121144f0d2fdc7105e978e2e266deb4d8216061d9668951fc",
-                "sha256:2d4139254c1cc69f2b5203f4a9aaab33a9e65f7994059856300ef6e21ac93f39"
+                "sha256:0d5425894e098410b64aaade38a81074fa30163076251118523adf5bb44f8346",
+                "sha256:7ab2f741ef1c006ed7274a6ed75695ca8b610f78861566b599ce83c4953bf687"
             ],
             "markers": "python_version >= '3.6'",
-            "version": "==13.4.0"
+            "version": "==13.6.0"
         },
         "flask": {
             "hashes": [
@@ -218,13 +218,12 @@
             "version": "==0.3.9"
         },
         "fonttools": {
-            "extras": [],
             "hashes": [
-                "sha256:696fe922a271584c3ec8325ba31d4001a4fd6c4953b22900b767f1cb53ce1044",
-                "sha256:b4da40696829845ea8c1cb33ce51c552179754cbee7ab4e8b96a6bcf421f437a"
+                "sha256:c0fdcfa8ceebd7c1b2021240bd46ef77aa8e7408cf10434be55df52384865f8e",
+                "sha256:f829c579a8678fa939a1d9e9894d01941db869de44390adb49ce67055a06cc2a"
             ],
             "markers": "python_version >= '3.7'",
-            "version": "==4.33.2"
+            "version": "==4.33.3"
         },
         "greenlet": {
             "hashes": [

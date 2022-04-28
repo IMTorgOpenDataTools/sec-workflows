@@ -30,7 +30,8 @@ from utils import (
     poll_sec_edgar,
     initialize_db,
     create_report,
-    get_press_releases
+    get_press_releases,
+    reset_files
 )
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
@@ -104,8 +105,11 @@ def main(args):
                 time.sleep(secs)
         case 'report':
             create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
+            create_report(report_type='accounting_policy', db=db, output_path=OUTPUT_REPORT_PATH)
             create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
             create_report(report_type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
+        case 'RESET_FILES':
+            reset_files()
 
     logger.info(f'Process exited')
                     
@@ -127,7 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("mode",
                         default='init',
                         nargs=1,
-                        choices=['init', 'run', 'report'], 
+                        choices=['init', 'run', 'report', 'RESET_FILES'], 
                         help="`init`ialize or `run` the process"
                         )
     args = parser.parse_args()

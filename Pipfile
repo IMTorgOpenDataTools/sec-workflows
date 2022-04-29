@@ -55,8 +55,8 @@ wkhtmltopdf = "==0.2"
 uTidylib = "==0.8"
 PyPDF2 = "==1.26.0"
 sec-edgar-downloader = {path = "./.lib/sec-edgar-downloader"}
-sec-edgar-extractor = {path = "./.lib/sec-edgar-extractor"}
 plotnine = "*"
+sec-edgar-extractor = {editable = true, path = "./.lib/sec-edgar-extractor"}
 
 [dev-packages]
 

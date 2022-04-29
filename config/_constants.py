@@ -142,12 +142,12 @@ accts = list(set(tmp))
 meta = MetaData()
 filings = Table(
     table_name, meta, 
-    Column('cik', String), 
+    Column('cik', String, primary_key = True), 
     Column('accn', String, primary_key = True), 
+    Column('form', String, primary_key = True),
     *(Column(acct, Integer()) for acct in accts ),
     Column('fy', String),
     Column('fp', String),
-    Column('form', String),
     Column('end', String),
     Column('filed', String),
     )

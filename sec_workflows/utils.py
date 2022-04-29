@@ -241,11 +241,11 @@ def initialize_db(db, firms):
                     rec = FilingMetadata(
                             cik = firm._cik,
                             accn = item['accn'],
+                            form = item['form'],
                             acct = acct_key,
                             val = scale_value(item['val'], acct_val.scale),
                             fy = item['fy'],
                             fp = item['fp'],
-                            form = item['form'],
                             end = item['end'],
                             filed = item['filed']
                     )
@@ -301,7 +301,7 @@ def get_press_releases(db, firms):
         #check each filing
         results = []
         for doc in df8k.to_dict('records'):
-            cik = doc['cik'] 
+            cik = str(doc['cik']) 
             fd = doc['dt_file_date']
             if cik in ciks10q:
                 dftmp = df10q[(df10q['cik'] == cik) & (df10q['dt_filed'] >= fd)]
@@ -341,56 +341,62 @@ def get_press_releases(db, firms):
 
 
     path_download = "./archive/downloads"
+    intermediate_step = Path('./archive/intermediate_dataframe.csv')
+    if intermediate_step.is_file:
+        df = pd.read_csv(intermediate_step)
+    else:
+        # download
+        ciks = [str(firm._cik) for firm in firms]
+        dl = Downloader(path_download)
+        for firm in firms:
+            TICKER = firm.get_info()['ticker']
+            urls = dl.get_urls("8-K",
+                                TICKER, 
+                                after="2021-01-01")   
+        df = dl.filing_storage.get_dataframe(mode='document')
+        sel1 = df[(df['short_cik'].isin(ciks)) & (df['file_type'] == '8-K') & (df['FS_Location'] == '')]
+        mask = sel1.apply(check, axis=1)
+        sel2 = sel1[mask]
+        sel2.shape
+        lst_of_idx = sel2.index.tolist()
+        staged = dl.filing_storage.get_document_in_record( lst_of_idx )
+        updated_docs = dl.get_documents_from_url_list(staged)
 
-    # download
-    ciks = [str(firm._cik) for firm in firms]
-    dl = Downloader(path_download)
-    for firm in firms:
-        TICKER = firm.get_info()['ticker']
-        urls = dl.get_urls("8-K",
-                            TICKER, 
-                            after="2021-01-01")   
-    df = dl.filing_storage.get_dataframe(mode='document')
-    sel1 = df[(df['short_cik'].isin(ciks)) & (df['file_type'] == '8-K') & (df['FS_Location'] == '')]
-    mask = sel1.apply(check, axis=1)
-    sel2 = sel1[mask]
-    sel2.shape
-    lst_of_idx = sel2.index.tolist()
-    staged = dl.filing_storage.get_document_in_record( lst_of_idx )
-    updated_docs = dl.get_documents_from_url_list(staged)
 
-    # extract
-    extractor = Extractor(config = config,
-                    save_intermediate_files = True
-                    )
-    recs = []
-    for doc in updated_docs:
-        cik = doc.FS_Location.parent.parent.name             #TODO:<<<fix this craziness by creating a class and providing attributes: cik, accn
-        target_firm = [firm for firm in firms if firm.get_info()['cik'].__str__()==cik][0]
-        ticker = target_firm.get_info()['ticker']
-        items = extractor.execute_extract_process(doc=doc, ticker=ticker)
-        items_key = list(items.keys())[0]
-        doc_meta = sel2[sel2.Document == doc.Document].to_dict('record')[0]
-        for acct, val in items[items_key].items():
-            rec = FilingMetadata(
-                            cik = str(doc_meta['short_cik']),
-                            accn = str(doc_meta['accession_number']),
-                            acct = acct,
-                            val = np.abs(val),
-                            fy = np.nan,
-                            fp = np.nan,
-                            form = f"{doc_meta['file_type']}/{doc.Type}",
-                            end = np.nan,
-                            filed = doc_meta['file_date']
-                    )
-            recs.append(rec)
+        # extract
+        extractor = Extractor(config = config,
+                        save_intermediate_files = True
+                        )
+        recs = []
+        for doc in updated_docs:
+            cik = doc.FS_Location.parent.parent.name             #TODO:<<<fix this craziness by creating a class and providing attributes: cik, accn
+            target_firm = [firm for firm in firms if firm.get_info()['cik'].__str__()==cik][0]
+            ticker = target_firm.get_info()['ticker']
+            items = extractor.execute_extract_process(doc=doc, ticker=ticker)
+            items_key = list(items.keys())[0]
+            doc_meta = sel2[sel2.Document == doc.Document].to_dict('record')[0]
+            for acct, val in items[items_key].items():
+                rec = FilingMetadata(
+                                cik = str(doc_meta['short_cik']),
+                                accn = str(doc_meta['accession_number']),
+                                form = f"{doc_meta['file_type']}/{doc.Type}",
+                                acct = acct,
+                                val = val,
+                                fy = np.nan,
+                                fp = np.nan,
+                                end = np.nan,
+                                filed = doc_meta['file_date']
+                        )
+                recs.append(rec)
+        df = pd.DataFrame(recs, columns=FilingMetadata._fields)
+        df.to_csv(intermediate_step, index=False)
 
     # prepare table
-    if len(recs) > 0:
-        df = pd.DataFrame(recs, columns=FilingMetadata._fields)
-        df_columns = df.drop(labels=['acct','val'], axis=1).drop_duplicates(subset=['cik','accn'])
-        df_wide = df.pivot(index=['cik','accn'], columns='acct', values='val').reset_index()
-        df_wide_total = pd.merge(df_wide, df_columns, on=['cik','accn'], how='left')
+    if df.shape[0] > 0:
+        df_columns = df.drop(labels=['acct','val'], axis=1).drop_duplicates(subset=['cik','accn','form'])
+        #check for duplicates that will cause error: df[df.duplicated(subset=['cik','accn','acct'])==True].shape
+        df_wide = df.pivot(index=['cik','accn','form'], columns='acct', values='val').reset_index()
+        df_wide_total = pd.merge(df_wide, df_columns, on=['cik','accn','form'], how='left')
         df_wide_total['filed'] = pd.to_datetime(df_wide_total['filed'])
         df_wide_total.sort_values(by='filed', ascending=False, inplace=True)
         df_8k = df_wide_total.copy(deep=True)
@@ -490,7 +496,11 @@ def create_report(report_type, db, output_path):
 
 
     def report_accounting(df_long, output_path=False):
-        days_from_last_qtr = [0, 90, 180]
+        ciks = df_long.cik.unique().tolist()
+        qtrly = ['10-K','10-Q']
+        days_from_last_qtr = [0, 90, 180, 270, 360]
+        df_long['yr-qtr'] = df_long.apply(create_qtr, axis=1)
+
         df_result = pd.DataFrame()
         df_result['cik'] = df_long['cik'].unique()
         df_result.set_index('cik', inplace=True)
@@ -498,26 +508,62 @@ def create_report(report_type, db, output_path):
         for days in days_from_last_qtr:
             prev = pd.Timestamp(datetime.now())  -  pd.to_timedelta( days, unit='d')
             prev_qtr = f'{prev.year}-{prev.quarter}'
-            df_long['yr-qtr'] = df_long.apply(create_qtr, axis=1)
-            qtrly = ['10-K','10-Q']
-            mask = ~df_long['form'].isin( qtrly ) if days == 90 else df_long['form'].isin( qtrly )
-            df_qtr = df_long[ (df_long['yr-qtr'] == prev_qtr) & (mask)]
+            # try 10-K/-Q first
+            # mask = ~df_long['form'].isin( qtrly ) if days == 90 else df_long['form'].isin( qtrly )
             # df_long[ (df_long['yr-qtr'] == '2021-4') & (~df_long['form'].isin( qtrly ))]
+            mask = df_long['form'].isin( qtrly )
+            df_10k_qtr = df_long[ (df_long['yr-qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False) & (mask)]
+            ciks_10k = df_10k_qtr.cik.unique()
+            if len(ciks_10k) < len(ciks):
+                mask = ~df_long['form'].isin( qtrly )
+                df_8k_qtr = df_long[ (df_long['yr-qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False)  & (mask)]
+                if len(ciks_10k) > 0:
+                    s8k = set(df_8k_qtr.cik)
+                    s10k = set(df_10k_qtr.cik)
+                    diff = list( s8k.difference(s10k) )
+                    df_10k_tmp = df_10k_qtr.drop_duplicates(subset=['cik'], inplace=False)
+                    df_8k_tmp = df_8k_qtr[df_8k_qtr.cik.isin(diff)].drop_duplicates(subset=['cik'], inplace=False)
+                    df_qtr = df_10k_tmp.append(df_8k_tmp)    #, ignore_index=True
+                else:
+                    df_qtr = df_8k_qtr
+            else:
+                df_qtr = df_10k_qtr
+
             df_qtr.drop_duplicates(subset=['cik'], inplace=True)
             df_qtr.set_index('cik', inplace=True)
             dfs[prev_qtr] = df_qtr
+
+        df_ACL = df_result.copy(deep=True)
+        df_Loans = df_result.copy(deep=True)
+        df_Ratio = df_result.copy(deep=True)
         for key in dfs.keys():
             if dfs[key].shape[0] > 0:
-                df_result = df_result.join(dfs[key]['ACL'], how='outer') 
-                df_result.rename(columns={'ACL':'ACL'+'|'+key}, inplace=True)
+                acl = np.abs( dfs[key]['ACL'] )
+                df_ACL = df_ACL.join(acl, how='outer') 
+                df_ACL.rename(columns={'ACL':'ACL'+'|'+key}, inplace=True)
+
+                loans = dfs[key]['Loans']
+                df_Loans = df_Loans.join(loans, how='outer') 
+                df_Loans.rename(columns={'Loans':'Loans'+'|'+key}, inplace=True)
+
+                ratio = acl / loans
+                ratio.name = 'Ratio'
+                df_Ratio = df_Ratio.join(ratio, how='outer') 
+                df_Ratio.rename(columns={'Ratio':'Ratio'+'|'+key}, inplace=True)
+
+        df_list = [df_ACL, df_Ratio]
+        df_result = df_result.join(df_list[0])
+        df_result = df_result.join(df_list[1])
         pass
 
 
     def template(df_long, dir_path=False):
+        start = date.today() + timedelta(days=30)
+        end = date.today() - timedelta(days=365*3)
         plt = (ggplot(aes(x='dt_filed', y='ACL'), df_long) 
                 + geom_point(aes(color='cik'), alpha=0.7)
                 + geom_line(aes(color='cik')) 
-                + scale_x_datetime(labels=date_format('%Y-%m')) 
+                + scale_x_datetime(labels=date_format('%Y-%m'), limits=[end, start]) 
                 + scale_y_log10()
                 + labs(y='log Allowance for credit losses', 
                         x='Date', 
@@ -601,9 +647,7 @@ def reset_files(mode='intermediate_files'):
         case 'intermediate_files':
             dir_path = './archive/downloads/sec-edgar-filings'
             acct_names = ['ACL', 'ALLL', 'PCL', 'Loans', 'ChargeOffs', 'ACLpctLoan', 'Charge Offs', 'ACLpct Loan']
-            #subdirs = os.listdirs(dir_path)
-            #docdirs = [os.listdirs(dir) for dir in subdirs]
-            #docfiles = [os.list(docdir) for docdir in docdirs]
+
             p = Path(dir_path)
             files = list(p.glob('**/*'))
             files_to_del = []

@@ -193,6 +193,8 @@ def make_long_cik(cik):
 
 def scale_value(val, scale):
     match scale:
+        case 'thousands':
+            result_val = val / 1000
         case 'millions':
             result_val = val / 1000000
         case 'billions':
@@ -388,6 +390,7 @@ def get_press_releases(db, firms):
                                 filed = doc_meta['file_date']
                         )
                 recs.append(rec)
+        #TODO:load raw recs individually to db table
         df = pd.DataFrame(recs, columns=FilingMetadata._fields)
         df.to_csv(intermediate_step, index=False)
 
@@ -470,12 +473,19 @@ def poll_sec_edgar(db, ciks):
     '''
 
 def create_qtr(row):
-    """Create the column formatted `yr-qtr`."""
-    if row['fp']=='FY': 
-        fp = 4
+    """Create the column formatted `yr-qtr` using pd.apply(<fun>, axis=1)."""
+    fy = row['fy']
+    fp = row['fp']
+    if fy == None or fp == None:
+        qtr = row['dt_filed'].quarter
+        yr = row['dt_filed'].year
     else:
-        fp = str(row['fp']).replace('Q','')
-    return str(row['fy']) + '-' + str(fp)
+        yr = fy
+        if row['fp']=='FY': 
+            qtr = '4'
+        else:
+            qtr = str(row['fp']).replace('Q','')
+    return f'{yr}-{qtr}'
 
 
 
@@ -496,6 +506,111 @@ def create_report(report_type, db, output_path):
 
 
     def report_accounting(df_long, output_path=False):
+        """Report quarterly accounts only using 8-K extractions."""
+
+        # prepare dataframe
+        ciks = df_long.cik.unique().tolist()
+        qtrly = ['10-K','10-Q']
+        df8k = df_long[~df_long.form.isin(qtrly) & (pd.isna(df_long['ACL'])==False)]
+        df8k['ACL_num'] = df8k['ACL'].apply(lambda x: np.abs( pd.to_numeric(x, errors='coerce')) )
+        df8k['Loans_num'] = df8k['Loans'].apply(lambda x: np.abs( pd.to_numeric(x, errors='coerce')) )
+        
+        now = pd.Timestamp(datetime.now())
+        initial_qtr = f'{now.year}-{now.quarter}'
+        df8k['yr-qtr'] = pd.DatetimeIndex(df8k['dt_filed']).year.astype(str) + '-Q' + pd.DatetimeIndex(df8k['dt_filed']).quarter.astype(str)
+        df8k.sort_values(by='dt_filed', inplace=True)
+        
+        dfcnt = pd.DataFrame( df8k['yr-qtr'].value_counts() )
+        dfcnt['date'] = pd.PeriodIndex(dfcnt.index, freq='Q').to_timestamp()
+        dfcnt['qtrs'] = dfcnt.index
+        dfcnt.sort_values(by='date', ascending=False, inplace=True)
+        qtrs = dfcnt.qtrs.tolist()
+
+        # get df for each qtr
+        df_result = pd.DataFrame()
+        df_result['cik'] = df_long['cik'].unique()
+        df_result.set_index('cik', inplace=True)
+        dfs = {}
+        for qtr in qtrs:
+            df_tmp = df8k[df8k['yr-qtr'] == qtr].drop_duplicates(subset='cik')
+            df_tmp.set_index('cik', inplace=True)
+            if df_tmp.shape[0] > 0:
+                dfs[qtr] = df_tmp
+
+        # create df by adding columns for each qtr
+        df_ACL = df_result.copy(deep=True)
+        df_Loans = df_result.copy(deep=True)
+        df_Ratio = df_result.copy(deep=True)
+        for key in dfs.keys():
+            if dfs[key].shape[0] > 0:
+                acl = dfs[key]['ACL_num']
+                df_ACL = df_ACL.join(acl, how='outer') 
+                df_ACL.rename(columns={'ACL_num':'ACL'+'|'+key}, inplace=True)
+
+                loans = dfs[key]['Loans_num']
+                df_Loans = df_Loans.join(loans, how='outer') 
+                df_Loans.rename(columns={'Loans_num':'Loans'+'|'+key}, inplace=True)
+
+                ratio = acl / loans
+                ratio.name = 'Ratio'
+                df_Ratio = df_Ratio.join(ratio, how='outer') 
+                df_Ratio.rename(columns={'Ratio':'Ratio'+'|'+key}, inplace=True)
+
+        # format output
+        firms = [(36104, 'USB'), (4962, 'AXP'), (927628, 'COF'), (35527, 'FITB'), (49196, 'HBAN'), (91576, 'KEY'), (895421, 'MS'), (19617, 'JPM'), (831001, 'C'), (72971, 'WFC'), (70858, 'BAC'), (713676, 'PNC'), (886982, 'GS'), (92230, 'TFC'), (40729, 'ALLY'), (759944, 'CFG'), (1504008, 'BKU')]
+        df_ACL['cik'] = df_ACL.index
+        bank = df_ACL['cik'].apply(lambda x: [item[1] for item in firms if str(item[0])==x][0] )
+        df_ACL.insert(0, "Bank", bank)
+        df_ACL.drop(columns='cik', inplace=True)
+
+        df_list = [df_ACL, df_Ratio]
+        df_result = df_result.join(df_list[0])
+        df_result = df_result.join(df_list[1])
+
+        #df_long[df_long.cik == '91576']
+        file_path = output_path / 'report_acl_acct.csv'
+        df_result.to_csv(file_path)
+        return df_ACL
+
+
+    def trend(df_ACL, output_path):
+        cols = df_ACL.columns
+        df = pd.melt(df_ACL, id_vars='Bank', value_vars=cols)
+        df.rename(columns={'value':'ACL'}, inplace=True)
+        df['yr-qtr'] = df['variable'].str.split('|').str[1]
+        df['dt_filed'] = pd.PeriodIndex(df['yr-qtr'], freq='Q').to_timestamp()
+        df['ACL'] = df.ACL.astype(float)
+        #tmp = df[df['Bank']!='BKU']
+
+        years = 2
+        start = date.today() + timedelta(days=30)
+        end = date.today() - timedelta(days=365*years)
+        plt = (ggplot(aes(x='dt_filed', y='ACL'), df) 
+                + geom_point(aes(color='Bank'), alpha=0.7)
+                + geom_line(aes(color='Bank')) 
+                + scale_x_datetime(labels=date_format('%Y-%m'), limits=[end, start]) 
+                #+ scale_y_log10()
+                + scale_y_continuous(limits=[0, 20000])
+                + labs(y='Allowance for credit losses', 
+                        x='Date', 
+                        title="Firms' Allowance for Credit Losses over Time")
+                + theme(figure_size=(12, 6))
+                )
+        plt_file_path = output_path / 'trend.jpg'
+        plt.save(filename = plt_file_path, height=3, width=9, units = 'in', dpi=250)
+        return True
+
+
+
+    def report_accounting_certified(df_long, output_path=False):
+        """FUTURE: Report of quarterly accounts using strict stability requirements.
+
+        Comparability requirements (currently deficient):
+        * 8-K data should only be used when certified 10-K/-Q data is not available (quarterly is incorrect because of inconsistency in reporting).  ​
+        * Certified 10-K/-Q data should be both stable and most-current (this may not be true for some accounts). ​
+        * Accounts between firms should be 'reasonably' comparable with descriptions documented (references needed).​
+
+        """
         ciks = df_long.cik.unique().tolist()
         qtrly = ['10-K','10-Q']
         days_from_last_qtr = [0, 90, 180, 270, 360]
@@ -554,7 +669,10 @@ def create_report(report_type, db, output_path):
         df_list = [df_ACL, df_Ratio]
         df_result = df_result.join(df_list[0])
         df_result = df_result.join(df_list[1])
-        pass
+        #df_long[df_long.cik == '91576']
+        file_path = './archive/report/report_acl_acct.csv'
+        df_result.to_csv(file_path, index=False)
+        return df_ACL
 
 
     def template(df_long, dir_path=False):
@@ -630,7 +748,9 @@ def create_report(report_type, db, output_path):
             result = report_accounting(df_long, dir_path)
         case 'trend':
             df_long = report_long()
-            result = template(df_long, dir_path)
+            #result = template(df_long, dir_path)
+            df_ACL = report_accounting(df_long, dir_path)
+            result = trend(df_ACL, dir_path)
         case 'validate':
             df_long = report_long()
             result = validate(df_long, dir_path)

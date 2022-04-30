@@ -84,6 +84,39 @@ class Database:
         return True
 
 
+    def initialize_db(self):
+        """Populate database with initial import of data from
+        multiple data sources."""
+        pass
+
+
+    def populate_quarterly_filings(self):
+        """Import quarterly (10-K/-Q) data from SEC EDGAR API."""
+        pass
+
+
+    def populate_earnings_releases(self):
+        """Download, extract, and import earnings (8-K_ data 
+        from SEC EDGAR API."""
+        pass
+
+
+    def populate_firm_data(self):
+        """Download and import firm data."""
+        pass
+
+
+    def populate_xbrl_descriptions(self):
+        """Scrape and import XBRL description data."""
+        pass
+
+
+    def get_filing_df(self):
+        """Get dataframe of filings from database table."""
+        pass
+
+
+
     def insert_df_to_table(self):
         pass
 

@@ -344,7 +344,7 @@ def get_press_releases(db, firms):
 
     path_download = "./archive/downloads"
     intermediate_step = Path('./archive/intermediate_dataframe.csv')
-    if intermediate_step.is_file:
+    if intermediate_step.is_file():
         df = pd.read_csv(intermediate_step)
     else:
         # download
@@ -563,6 +563,13 @@ def create_report(report_type, db, output_path):
         df_ACL.insert(0, "Bank", bank)
         df_ACL.drop(columns='cik', inplace=True)
 
+        cols = df_ACL.columns.tolist()
+        cols.pop(0)   #remove 'Bank'
+        # if incorrect, then just make NaN
+        for col in cols:
+            df_ACL.loc[df_ACL[col] < 100, col] = np.nan
+        #df_ACL = df_ACL[df_ACL['Bank']!='BKU']              #TODO:change once updated, but check first
+
         df_list = [df_ACL, df_Ratio]
         df_result = df_result.join(df_list[0])
         df_result = df_result.join(df_list[1])
@@ -574,13 +581,13 @@ def create_report(report_type, db, output_path):
 
 
     def trend(df_ACL, output_path):
-        cols = df_ACL.columns
+        cols = df_ACL.columns.tolist()
+        cols.pop(0)   #remove 'Bank'
         df = pd.melt(df_ACL, id_vars='Bank', value_vars=cols)
         df.rename(columns={'value':'ACL'}, inplace=True)
         df['yr-qtr'] = df['variable'].str.split('|').str[1]
         df['dt_filed'] = pd.PeriodIndex(df['yr-qtr'], freq='Q').to_timestamp()
         df['ACL'] = df.ACL.astype(float)
-        #tmp = df[df['Bank']!='BKU']
 
         years = 2
         start = date.today() + timedelta(days=30)
@@ -731,6 +738,8 @@ def create_report(report_type, db, output_path):
         for acct in accts:
             left = acct+'_x'
             right = acct+'_y'
+            df_tmp[left] = df_tmp[left].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True)
+            df_tmp[right] = df_tmp[right].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True)
             df_tmp[acct+'_diff'] = df_tmp[left] - df_tmp[right]
             #df_tmp.drop(columns=[left, right], inplace=True)
         df_valid = df_tmp

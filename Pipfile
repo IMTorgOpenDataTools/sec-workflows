@@ -57,6 +57,7 @@ PyPDF2 = "==1.26.0"
 sec-edgar-downloader = {path = "./.lib/sec-edgar-downloader"}
 plotnine = "*"
 sec-edgar-extractor = {editable = true, path = "./.lib/sec-edgar-extractor"}
+xlsxwriter = "*"
 
 [dev-packages]
 

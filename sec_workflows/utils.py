@@ -15,6 +15,7 @@ from pathlib import Path
 import time
 from datetime import datetime, date, timedelta
 
+import xlsxwriter
 import pdfkit
 import base64
 
@@ -194,11 +195,11 @@ def make_long_cik(cik):
 def scale_value(val, scale):
     match scale:
         case 'thousands':
-            result_val = val / 1000
+            result_val = val * 1000
         case 'millions':
-            result_val = val / 1000000
+            result_val = val * 1000000
         case 'billions':
-            result_val = val / 1000000000
+            result_val = val * 1000000000
         case _:
             result_val = val
     return result_val
@@ -245,7 +246,7 @@ def initialize_db(db, firms):
                             accn = item['accn'],
                             form = item['form'],
                             acct = acct_key,
-                            val = scale_value(item['val'], acct_val.scale),
+                            val = item['val'],                  #not necessary: scale_value(item['val'], acct_val.scale),
                             fy = item['fy'],
                             fp = item['fp'],
                             end = item['end'],
@@ -341,6 +342,18 @@ def get_press_releases(db, firms):
             return False
 
 
+    def scale_value(val, scale):
+        match scale:
+            case 'thousands':
+                result_val = val * 1000
+            case 'millions':
+                result_val = val * 1000000
+            case 'billions':
+                result_val = val * 1000000000
+            case _:
+                result_val = val
+        return result_val
+
 
     path_download = "./archive/downloads"
     intermediate_step = Path('./archive/intermediate_dataframe.csv')
@@ -374,16 +387,19 @@ def get_press_releases(db, firms):
             cik = doc.FS_Location.parent.parent.name             #TODO:<<<fix this craziness by creating a class and providing attributes: cik, accn
             target_firm = [firm for firm in firms if firm.get_info()['cik'].__str__()==cik][0]
             ticker = target_firm.get_info()['ticker']
+
             items = extractor.execute_extract_process(doc=doc, ticker=ticker)
             items_key = list(items.keys())[0]
             doc_meta = sel2[sel2.Document == doc.Document].to_dict('record')[0]
             for acct, val in items[items_key].items():
+                if type(val) == str: continue
+                scale = config[ticker].accounts[acct].scale
                 rec = FilingMetadata(
                                 cik = str(doc_meta['short_cik']),
                                 accn = str(doc_meta['accession_number']),
                                 form = f"{doc_meta['file_type']}/{doc.Type}",
                                 acct = acct,
-                                val = val,
+                                val = scale_value(val, scale),
                                 fy = np.nan,
                                 fp = np.nan,
                                 end = np.nan,
@@ -404,17 +420,23 @@ def get_press_releases(db, firms):
         df_wide_total.sort_values(by='filed', ascending=False, inplace=True)
         df_8k = df_wide_total.copy(deep=True)
 
+        # TODO: separate into another function.  df_10q may be empty
         df_10q = pd.read_sql(db.table_name, con=db.engine)
-        table_cols = df_10q.columns.to_list()
-        df_10q['yr-qtr'] = df_10q.apply(create_qtr, axis=1)
-        df_10q['short_cik'] = df_10q['cik'].astype(str)
-        df_8k['yr-qtr'] = get_8k_qtr(df_8k, df_10q)
-        df_8k['fy'] = df_8k['yr-qtr'].str.split(pat='-').str[0]
-        df_8k['fp'] = df_8k['yr-qtr'].str.split(pat='-').str[1].replace({'1':'Q1','2':'Q2','3':'Q3','4':'FY'})
-        current_cols = df_8k.columns
-        select_cols = [col for col in current_cols if col in table_cols]
-        df_to_commit = df_8k[select_cols]
-
+        if df_10q.shape[0] > 0:
+            table_cols = df_10q.columns.to_list()
+            df_10q['yr-qtr'] = df_10q.apply(create_qtr, axis=1)
+            df_10q['short_cik'] = df_10q['cik'].astype(str)
+            df_8k['yr-qtr'] = get_8k_qtr(df_8k, df_10q)
+            df_8k['fy'] = df_8k['yr-qtr'].str.split(pat='-').str[0]
+            df_8k['fp'] = df_8k['yr-qtr'].str.split(pat='-').str[1].replace({'1':'Q1','2':'Q2','3':'Q3','4':'FY'})
+            current_cols = df_8k.columns
+            select_cols = [col for col in current_cols if col in table_cols]
+            df_to_commit = df_8k[select_cols]
+        else:
+            df_8k['fy'] = None
+            df_8k['fp'] = None
+            df_to_commit = df_8k
+        
     # load into db
         try:
             df_to_commit.to_sql(db.table_name, 
@@ -577,6 +599,70 @@ def create_report(report_type, db, output_path):
         #df_long[df_long.cik == '91576']
         file_path = output_path / 'report_acl_acct.csv'
         df_result.to_csv(file_path)
+
+
+        def create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df, qtrs, hdr_title):
+            hdr_rows = 2
+            time_periods = len(qtrs)
+            col_end = col_start + time_periods
+            row_end = row_start + df.shape[0]
+            data_row_start = row_start + hdr_rows
+            data_row_end = row_end + hdr_rows
+
+            worksheet.set_column(col_start, col_end - 1, 11.5)          #header requires `-1` because it is inclusive
+            worksheet.set_row(row_start, 20)
+            worksheet.set_row(row_start+1, 20)
+            worksheet.merge_range(row_start,col_start, row_start,col_end-1, hdr_title, header_format)
+            for idx, qtr in enumerate( qtrs ):
+                col = col_start + idx
+                worksheet.write_string(1, col, qtr, header_format)
+
+            for idxC, col in enumerate( range(col_start, col_end)):
+                for idxR, data_row in enumerate( range(data_row_start, data_row_end)):
+                    raw_value = df.iloc[idxR, idxC + df_col_offset]
+                    if raw_value > 1:
+                        value = raw_value / 1000000
+                        data_format = workbook.add_format({'num_format': '#,##0.0'})
+                    else:
+                        value = raw_value
+                        data_format = workbook.add_format({'num_format': '0.000'})
+                    if pd.isna(value): 
+                        worksheet.write_string(data_row, col, '-', missing_format)
+                    else:
+                        worksheet.write_number(data_row, col, value, data_format)
+
+
+        # xlsx report
+        file_path = output_path / 'report_acl_acct.xlsx'
+        workbook = xlsxwriter.Workbook(file_path)
+        worksheet = workbook.add_worksheet()
+
+        banks = df_ACL.Bank.tolist()
+        col_start = 2
+        row_start = 0
+        df_col_offset = 1                               #shift one column for banks
+        section2_col_start = col_start + 1 * len(qtrs) + 1 * 1
+        section3_col_start = col_start + 2 * len(qtrs) + 2 * 1
+
+        header_format = workbook.add_format({
+            'bold': 1,
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'})
+        missing_format = workbook.add_format({'align': 'center'})
+
+        for idx, ticker in enumerate(banks):
+            row = idx + 2
+            worksheet.write_string(row, 1, ticker, header_format)
+
+        create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df_ACL, qtrs, hdr_title='Allowance for Credit Losses')
+        df_col_offset = 0
+        create_xlsx_section(worksheet, row_start, section2_col_start, df_col_offset, df_Loans, qtrs, hdr_title='Loans')
+        create_xlsx_section(worksheet, row_start, section3_col_start, df_col_offset, df_Ratio, qtrs, hdr_title='Coverage')
+        workbook.close()
+
+
+        # return
         return df_ACL
 
 

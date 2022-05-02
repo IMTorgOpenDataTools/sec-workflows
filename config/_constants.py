@@ -119,7 +119,7 @@ def load_config_account_info(file=None):
 
 
 
-firms_file = './config/ciks.csv'
+firms_file = './config/ciks_test.csv'
 """"accounts_file = './config/accounts.csv'"""
 accounts_file = './config/Firm_Account_Info.csv'
 

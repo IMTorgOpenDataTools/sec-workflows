@@ -9,7 +9,6 @@ PNC,Loans,FinancingReceivableExcludingAccruedInterestBeforeAllowanceForCreditLos
 WFC,ACL,FinancingReceivableAllowanceForCreditLosses,In API,CHANGES IN ALLOWANCE FOR CREDIT LOSSES FOR LOANS,Allowance for credit losses for loans,"Year ended <MON> <DAY>, / <YYYY>",0,millions,NA,NA,EX-99.2,NA
 WFC,Loans,NotesReceivableGross,In API,CONSOLIDATED BALANCE SHEET,Loans,<left-most>,0,millions,NA,NA,EX-99.2,NA
 ALLY,ACL,FinancingReceivableAllowanceForCreditLossExcludingAccruedInterest,In API - default is also,CONSOLIDATED PERIOD-END BALANCE SHEET,Allowance for loan losses,<left-most>,0,millions,NA,NA,EX-99.3,NA
-ALLY,ALLL,FinancingReceivableAllowanceForCreditLossExcludingAccruedInterest,NA,CONSOLIDATED FINANCIAL HIGHLIGHTS,Allowance for loans losses,<left-most>,0,millions,NA,NA,EX-99.3,NA
 ALLY,Loans,FinancingReceivableExcludingAccruedInterestAfterAllowanceForCreditLoss,In API,CONSOLIDATED PERIOD-END BALANCE SHEET,"Total finance receivables and loans, net",<left-most>,0,millions,NA,NA,EX-99.3,NA
 GS,ACL,gs:AllowanceForLossesOnLoansAndLendingCommitments,In API,NA,NA,<left-most>,0,millions,NA,NA,NA,NA
 GS,ALLL,AllowanceForLoanAndLeaseLossesWriteOffs,In API,NA,NA,NA,NA,NA,NA,NA,NA,NA
@@ -26,7 +25,7 @@ CFG,Loans,NotesReceivableGross,In API,Interest-earning assets,Total loans and le
 KEY,ACL,FinancingReceivableAllowanceForCreditLosses,InAPI,Consolidated Balance Sheets,Allowance for loan and lease losses,<left-most>,0,millions,NA,NA,EX-99.3,NA
 KEY,Loans,NotesReceivableGross,InAPI,Consolidated Balance Sheets,Loans,<left-most>,0,millions,NA,NA,EX-99.3,NA
 AXP,ACL,FinancingReceivableAllowanceForCreditLosses,Not in API,Selected Credit Related Statistical Information,Ending balance,<left-most>,0,millions,NA,NA,EX-99.2,NA
-AXP,Loans,NotesReceivableGross,In API - may be discontinued,Selected Credit Related Statistical Information,Total loans,<left-most>,0,millions,NA,NA,EX-99.2,NA
+AXP,Loans,NotesReceivableGross,In API - may be discontinued,Selected Credit Related Statistical Information,Total loans,<left-most>,0,billions,NA,NA,EX-99.2,NA
 COF,ACL,FinancingReceivableAllowanceForCreditLosses,In API,Consolidated Balance Sheets,Allowance for credit losses,<left-most>,0,millions,NA,NA,EX-99.2,NA
 COF,Loans,NotesReceivableGross,In API,Consolidated Balance Sheets,Total loans held for investment,<left-most>,0,millions,NA,NA,EX-99.2,NA
 FITB,ACL,FinancingReceivableAllowanceForCreditLossExcludingAccruedInterest,In API,Credit Quality Summary,Total allowance for credit losses (ACL),<left-most>,0,millions,NA,NA,EX-99.1,NA

@@ -85,6 +85,7 @@ def main(args):
         case 'init':
             api = initialize_db(db, firms)
             scrape = get_press_releases(db, firms)
+            # TODO: add those to `raw_` files, then combine, here
             if api and scrape: 
                 create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
                 logger.info(f'Database initialization complete')
@@ -106,8 +107,8 @@ def main(args):
         case 'report':
             create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
             create_report(report_type='accounting_policy', db=db, output_path=OUTPUT_REPORT_PATH)
-            create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
-            create_report(report_type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
+            #create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
+            #create_report(report_type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
         case 'RESET_FILES':
             reset_files()
 

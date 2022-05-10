@@ -34,7 +34,7 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
 
 ## TODO
 
-* add extraction workflow
+* ~~add extraction workflow~~
 * init
   - check db before inserting new records
 * run 
@@ -42,6 +42,6 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
 * ~~debug code in order~~
 * ~~determine where `sec-edgar-downloader` will be added~~
   - ~~add api requests to module~~
-* add logging
-* format excel report
-* integrate sec-edgar-downloader
+* ~~add logging~~
+* ~~format excel report~~
+* ~~integrate sec-edgar-downloader~~

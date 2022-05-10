@@ -7,6 +7,8 @@ from collections import namedtuple
 from sqlalchemy import Table, Column, Integer, String, MetaData
 import pandas as pd
 
+from sec_edgar_extractor.extract import Extractor
+
 
 # SEC limits users to no more than 10 requests per second
 # Sleep 0.1s between each request to prevent rate-limiting
@@ -37,13 +39,13 @@ def load_accounts(file_path):
 
 account_defaults = {
     'ACL': {'xbrl':'FinancingReceivableAllowanceForCreditLosses','term':'Allowance for credit loss'},
-    'ALLL': {'xbrl':'FinancingReceivableAllowanceForCreditLosses','term':'allowance for loan and lease losses'},
-    'PCL': {'xbrl':'ProvisionForLoanLeaseAndOtherLosses','term':'Provision for credit loss'},
-    'ChargeOffs': {'xbrl':'FinancingReceivableAllowanceForCreditLossesWriteOffsNet','term':'charge-off'},
+#   'ALLL': {'xbrl':'FinancingReceivableAllowanceForCreditLosses','term':'allowance for loan and lease losses'},
+#   'PCL': {'xbrl':'ProvisionForLoanLeaseAndOtherLosses','term':'Provision for credit loss'},
+#   'ChargeOffs': {'xbrl':'FinancingReceivableAllowanceForCreditLossesWriteOffsNet','term':'charge-off'},
     'Loans': {'xbrl':'NotesReceivableGross','term':'Loan'},
-    'ACLpctLoan': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of loans'},
-    'ALLpctLoan': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of loans'},
-    'ALLLpctLHFI': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of LHFI'}
+#    'ACLpctLoan': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of loans'},
+#    'ALLpctLoan': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of loans'},
+#    'ALLLpctLHFI': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of LHFI'}
 }
 
 AccountRecord = namedtuple(
@@ -67,7 +69,7 @@ FirmRecord = namedtuple(
     ]
 )
 
-
+'''
 def load_config_account_info(file=None):
     """"Load all account_info and return config(uration) dict.
     TODO:add more defaults 
@@ -75,35 +77,35 @@ def load_config_account_info(file=None):
     def get_default_if_missing(rec, key):
         defaults = account_defaults
         acct = account
-        return rec[key] if math.isnan(rec[key]) == False else defaults[acct]['term']
+        return rec[key] if math.isnan(rec[key]) == False else defaults[acct]["term"]
 
     if file==None:
-        file = './config/Firm_Account_Info.csv'
-    df = pd.read_csv(file, na_values=['NA',''])
-    tickers = df['ticker'].value_counts().index
-    accounts = df['name'].value_counts().index
+        file = "./config/Firm_Account_Info.csv"
+    df = pd.read_csv(file, na_values=["NA",""])
+    tickers = df["ticker"].value_counts().index
+    accounts = df["name"].value_counts().index
     config = {}
 
     for ticker in tickers:
         tmp_accts = {}
         for account in accounts:
-            tmp_df = df[(df['ticker']== ticker) & (df['name']==account)]
+            tmp_df = df[(df["ticker"]== ticker) & (df["name"]==account)]
             if tmp_df.shape[0] == 1:
-                tmp_rec = tmp_df.to_dict('records')[0]
+                tmp_rec = tmp_df.to_dict("records")[0]
                 tmp_acct = AccountRecord(                                
-                    name = tmp_rec['name'],
-                    xbrl = tmp_rec['xbrl'],
-                    table_name = tmp_rec['table_name'],
-                    table_account = tmp_rec['table_title'],
-                    table_column = tmp_rec['col_idx'],
-                    scale = tmp_rec['scale'],
-                    discover_terms = get_default_if_missing(rec=tmp_rec, key='discover_terms'),
-                    search_terms = get_default_if_missing(rec=tmp_rec, key='search_terms'),
-                    exhibits = tmp_rec['exhibits']
+                    name = tmp_rec["name"],
+                    xbrl = tmp_rec["xbrl"],
+                    table_name = tmp_rec["table_name"],
+                    table_account = tmp_rec["table_title"],
+                    table_column = tmp_rec["col_idx"],
+                    scale = tmp_rec["scale"],
+                    discover_terms = get_default_if_missing(rec=tmp_rec, key="discover_terms"),
+                    search_terms = get_default_if_missing(rec=tmp_rec, key="search_terms"),
+                    exhibits = tmp_rec["exhibits"]
                 )
                 tmp_accts[account] = tmp_acct
             else:
-                print(f'ERROR: tmp_df has {tmp_df.shape[0]} rows')
+                #print(f'ERROR: tmp_df has {tmp_df.shape[0]} rows')
                 break
         tmp_firm = FirmRecord(
                 Firm = ticker,
@@ -112,7 +114,7 @@ def load_config_account_info(file=None):
         config[ticker] = tmp_firm
 
     return config
-
+'''
 
 
 
@@ -134,24 +136,45 @@ QUARTERS_IN_TABLE = 6
 OUTPUT_REPORT_PATH = './archive/report/long_output.csv'
 
 """"accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"""
-config = load_config_account_info(file=accounts_file)
+#config = load_config_account_info(file=accounts_file)
+extractor = Extractor(save_intermediate_files=True)
+config = extractor.config
 tmp = []
 [tmp.extend(item.accounts.keys()) for item in config.values()]
 accts = list(set(tmp))
 
 meta = MetaData()
-filings = Table(
-    table_name, meta, 
+
+records = Table(
+    'records', meta, 
     Column('cik', String, primary_key = True), 
     Column('accn', String, primary_key = True), 
     Column('form', String, primary_key = True),
-    *(Column(acct, Integer()) for acct in accts ),
+    Column('account', String, primary_key = True),
+    Column('value', Integer),
+    Column('account_title', String),
+    Column('xbrl_tag', String),
     Column('fy', String),
     Column('fp', String),
     Column('end', String),
     Column('filed', String),
     )
+schema = [col.name for col in records.columns]      
+RecordMetadata = namedtuple("RecordMetadata", schema) 
 
+filings = Table(
+    'filings', meta, 
+    Column('cik', String, primary_key = True), 
+    Column('accn', String, primary_key = True), 
+    Column('form', String, primary_key = True),
+    *(Column(acct, Integer()) for acct in accts ),
+    Column('titles', String),
+    Column('fy', String),
+    Column('fp', String),
+    Column('end', String),
+    Column('filed', String),
+    )
 schema = [col.name for col in filings.columns if col.name not in accts]
 schema.extend(['acct', 'val'])       
 FilingMetadata = namedtuple("FilingMetadata", schema) 
+

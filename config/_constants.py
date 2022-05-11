@@ -21,7 +21,9 @@ MAX_RETRIES = 5
 # Time to wait for response from server (seconds)
 DEFAULT_TIMEOUT = 5
 
-
+MINUTES_BETWEEN_CHECKS = 0.10
+QUARTERS_IN_TABLE = 6
+OUTPUT_REPORT_PATH = './archive/report/long_output.csv'
 
 
 
@@ -35,7 +37,7 @@ def load_accounts(file_path):
         k,v = line.replace('\n','').split(',')
         account_dict[k] = v
     return account_dict  
-'''
+
 
 account_defaults = {
     'ACL': {'xbrl':'FinancingReceivableAllowanceForCreditLosses','term':'Allowance for credit loss'},
@@ -47,6 +49,7 @@ account_defaults = {
 #    'ALLpctLoan': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of loans'},
 #    'ALLLpctLHFI': {'xbrl':'FinancingReceivableAllowanceForCreditLossToOutstandingPercent','term':'as percent of LHFI'}
 }
+'''
 
 AccountRecord = namedtuple(
     "AccountRecord",
@@ -122,20 +125,18 @@ def load_config_account_info(file=None):
 
 
 firms_file = './config/ciks_test.csv'
-""""accounts_file = './config/accounts.csv'"""
-accounts_file = './config/Firm_Account_Info.csv'
+#accounts_file = './config/accounts.csv'
+#accounts_file = './config/Firm_Account_Info.csv'
 
 sec_edgar_downloads_path = './archive'
 log_file = './archive/process.log'
 db_file = './archive/test.db'
 #db_path = f'sqlite:///{db_file}'     #for testing: 'sqlite://'
-table_name = 'filings'
 
-MINUTES_BETWEEN_CHECKS = 0.10
-QUARTERS_IN_TABLE = 6
-OUTPUT_REPORT_PATH = './archive/report/long_output.csv'
 
-""""accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"""
+
+
+#accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"
 #config = load_config_account_info(file=accounts_file)
 extractor = Extractor(save_intermediate_files=True)
 config = extractor.config
@@ -159,8 +160,8 @@ records = Table(
     Column('end', String),
     Column('filed', String),
     )
-schema = [col.name for col in records.columns]      
-RecordMetadata = namedtuple("RecordMetadata", schema) 
+schema_records = [col.name for col in records.columns]      
+RecordMetadata = namedtuple("RecordMetadata", schema_records) 
 
 filings = Table(
     'filings', meta, 
@@ -174,7 +175,11 @@ filings = Table(
     Column('end', String),
     Column('filed', String),
     )
-schema = [col.name for col in filings.columns if col.name not in accts]
-schema.extend(['acct', 'val'])       
-FilingMetadata = namedtuple("FilingMetadata", schema) 
+schema_filing = [col.name for col in filings.columns if col.name not in accts]
+schema_filing.extend(['acct', 'val'])       
+FilingMetadata = namedtuple("FilingMetadata", schema_filing) 
 
+tables_list = [
+                {'name': 'records', 'table': records, 'schema': schema_records}, 
+                {'name': 'filings', 'table': filings, 'schema': schema_filing}
+                ]

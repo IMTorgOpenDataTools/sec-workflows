@@ -37,10 +37,9 @@ import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     firms_file,
-    accounts_file,
     log_file,
     db_file,
-    table_name,
+    tables_list,
     MINUTES_BETWEEN_CHECKS,
     QUARTERS_IN_TABLE,
     OUTPUT_REPORT_PATH,
@@ -69,16 +68,16 @@ def main(args):
     #configure
     firms = load_firms(firms_file)
     db = Database(db_file = db_file,
-                    table_name= table_name,
+                    tables_list = tables_list,
                     meta = meta,
                     logger = logger
                     )
 
     #check db file
-    check = db.check_db_file()
+    check_db = db.check_db_file()
 
     #check db schema
-    db.check_db_schema()
+    check_schema = db.check_db_schema()
 
     #process
     match args.mode[0]:

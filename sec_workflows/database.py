@@ -29,7 +29,7 @@ import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     db_file,
-    table_name,
+    tables_list,
     MINUTES_BETWEEN_CHECKS,
     QUARTERS_IN_TABLE,
     accts,
@@ -44,19 +44,21 @@ from _constants import (
 class Database:
     """Database class."""
 
-    def __init__(self, db_file, table_name, meta, logger):
+    def __init__(self, db_file, tables_list, meta, logger):
         self.db_file = db_file
         self.db_path = f'sqlite:///{db_file}' 
-        self.table_name = table_name
+        self.table_name = tables_list
         self.meta = meta
         self.engine = None
         self.logger = logger
 
 
     def check_db_file(self):
+        """Check the database file exists."""
         path = Path(self.db_file)
         if not path.is_file():
             self.logger.warning('Database file not found.')
+            #TODO:create db file
             return False
         else:
             self.logger.warning('Database file exists.')
@@ -64,24 +66,39 @@ class Database:
 
 
     def check_db_schema(self):
+        """Check the database table schemas are correct."""
         engine = sql.create_engine(self.db_path, echo=True)
         self.engine = engine
         self.meta.reflect(bind=engine)
-        if not sql_util.database_exists(engine.url) and not sql.inspect(engine).has_table(self.table_name):      #not engine.dialect.has_table(engine, table_name, schema):
-            self.logger.warning('Database does not exist.  Making it now.')     
-            self.meta.create_all(engine)                                                                         #create_database(engine.url)
-            self.logger.warning('Database created.') 
+        if not sql_util.database_exists(engine.url):
+            check_tables = []
+            for tbl in self.table_name:
+                check = sql.inspect(engine).has_table(tbl['name']) 
+                check_tables.append(check)
+                if not all(check_tables):
+                    self.logger.warning('Database does not exist.  Making it now.')     
+                    self.meta.create_all(engine)                                                                         
+                    self.logger.warning('Database created.') 
         else:
-            check = self.validate_db()
+            self.logger.info('Database table and schema correct.')
+            check = self.validate_db_records()
             if check:
-                self.logger.info('Database table and schema correct.')
+                self.logger.info('Database table are populated.')
         return None
 
 
-    def validate_db(self):
-        """Validate the database table `filings` is populated."""
-        #filings: not sql_util.database_exists(engine.url) and not sql.inspect(engine).has_table(table_name), get_columns(tbl_name),
-        return True
+    def validate_db_records(self):
+        """Validate the database tables are populated."""
+        populated = []
+        for tbl in self.table_name:
+            stmt = sql.select( tbl['table'] )
+            with sql.orm.Session(self.engine) as session:
+                row = session.execute(stmt).first()
+                populated.append( row )
+        if all(populated):
+            return True
+        else:
+            return False
 
 
     def initialize_db(self):
@@ -134,5 +151,5 @@ class Database:
         for row in result:
             print (row)
         '''
-        df = pd.read_sql_table(self.table_name, self.engine)
+        df = pd.read_sql_table(self.table_name[1]['name'], self.engine)
         return df

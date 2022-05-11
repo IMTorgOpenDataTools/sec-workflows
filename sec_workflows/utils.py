@@ -35,19 +35,13 @@ from sec_edgar_extractor.instance_doc import Instance_Doc
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    log_file,
     sec_edgar_downloads_path,
-    db_file,
-    table_name,
     MAX_RETRIES,
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     DEFAULT_TIMEOUT,
     MINUTES_BETWEEN_CHECKS,
     QUARTERS_IN_TABLE,
     accts,
-    #config,
-    meta,
-    filings,
     RecordMetadata,
     FilingMetadata
 )
@@ -308,7 +302,7 @@ def initialize_db(db, firms):
         df_wide_total.sort_values(by="filed", ascending=False, inplace=True)
         #TODO: apply FilingMetadata before importing
         try:
-            df_wide_total.to_sql(db.table_name, 
+            df_wide_total.to_sql(db.table_name[1]['name'], 
                     con=db.engine,
                     if_exists="append", 
                     index=False
@@ -556,7 +550,7 @@ def get_press_releases(db, firms):
         df_8k = df_wide_total.copy(deep=True)
 
         # TODO: separate into another function.  df_10q may be empty
-        df_10q = pd.read_sql(db.table_name, con=db.engine)
+        df_10q = pd.read_sql(db.table_name[1]['name'], con=db.engine)
         if df_10q.shape[0] > 0:
             table_cols = df_10q.columns.to_list()
             df_10q['yr-qtr'] = df_10q.apply(create_qtr, axis=1)
@@ -574,7 +568,7 @@ def get_press_releases(db, firms):
         
     # load into db
         try:
-            df_to_commit.to_sql(db.table_name, 
+            df_to_commit.to_sql(db.table_name[1]['name'], 
                     con=db.engine,
                     if_exists='append', 
                     index=False
@@ -582,7 +576,7 @@ def get_press_releases(db, firms):
         except sql.exc.IntegrityError as e:
             logger.warning('Unique key violation on insert')
         else:
-            logger.info(f'Inserted {df_8k.shape[0]} records to table {db.table_name}')
+            logger.info(f'Inserted {df_8k.shape[0]} records to table {db.table_name[1]["name"]}')
         return True
     else:
         return False

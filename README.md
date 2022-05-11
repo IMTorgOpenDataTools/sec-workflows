@@ -34,14 +34,10 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
 
 ## TODO
 
-* ~~add extraction workflow~~
+* run with all banks and get new accounting policy report
+* create config with topic (ACL) and list of associated xbrl tags
 * init
-  - check db before inserting new records
-* run 
-  - fix workflow
-* ~~debug code in order~~
-* ~~determine where `sec-edgar-downloader` will be added~~
-  - ~~add api requests to module~~
-* ~~add logging~~
-* ~~format excel report~~
-* ~~integrate sec-edgar-downloader~~
+  - save to `records` so less work if redo
+  - check db `records` before inserting new records
+
+

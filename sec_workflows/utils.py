@@ -778,10 +778,10 @@ def create_report(report_type, db, output_path):
                                     }
                     if raw_value > 1:
                         value = raw_value / 1000000
-                        data_format = workbook.add_format({'num_format': '#,##0.0'})
+                        data_format = workbook.add_format({'num_format': '#,##0.0', 'border':1})
                     else:
                         value = raw_value
-                        data_format = workbook.add_format({'num_format': '0.000'})
+                        data_format = workbook.add_format({'num_format': '0.000', 'border':1})
                     if pd.isna(value): 
                         url_filled = url.format(cik=meta_value['cik'], accn_wo_dash=meta_value['accn'].replace('-',''), accn=meta_value['accn'])
                         comment = f'Form: {meta_value["form"]} \nTitle: {meta_value["title"]} \nXBRL: {meta_value["xbrl"]} \nconfidence: 0 \ndoc url: {url_filled}'
@@ -809,6 +809,9 @@ def create_report(report_type, db, output_path):
         header_format = workbook.add_format({
             'bold': 1,
             'border': 1,
+            'bg_color': '#060a7d',
+            'font_color': 'white',
+            'font_size': 14,
             'align': 'center',
             'valign': 'vcenter'})
         missing_format = workbook.add_format({

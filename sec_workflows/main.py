@@ -27,9 +27,7 @@ import argparse
 from database import Database
 from utils import (
     poll_sec_edgar,
-    initialize_db,
     create_report,
-    get_press_releases,
     reset_files
 )
 import sys
@@ -80,10 +78,12 @@ def main(args):
     #process
     match args.mode[0]:
         case 'init':
-            api = initialize_db(db, firms)
-            scrape = get_press_releases(db, firms)
-            # TODO: add those to `raw_` files, then combine, here
-            if api and scrape: 
+            api = db.initialize_db(firms)
+            scrape = db.get_press_releases(firms)
+            format_10q = db.format_raw_quarterly_records()
+            format_8k = db.format_raw_earnings_records()
+
+            if all([api, scrape, format_10q, format_8k]): 
                 create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
                 logger.info(f'Database initialization complete')
             else:

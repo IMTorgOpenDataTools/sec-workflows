@@ -201,6 +201,7 @@ def create_qtr(row):
     more than two months, later.
     
     """
+    row['end'] = pd.to_datetime(row['end'])
     fy = row['fy']
     fp = row['fp']
     if fy == None or fp == None:
@@ -209,9 +210,9 @@ def create_qtr(row):
     else:
         yr = fy
         if row['fp']=='FY': 
-            qtr = '4'
+            qtr = 'Q4'
         else:
-            qtr = str(row['fp']).replace('Q','')
+            qtr = str(row['fp'])
     return f'{yr}-{qtr}'
 
 """
@@ -648,7 +649,10 @@ def create_report(report_type, db, output_path):
     def report_long(output_path=False):
         df = db.query_database()
         df['dt_filed'] = pd.to_datetime(df.filed)
-        df.sort_values(by=['cik','dt_filed'], inplace=True, ascending=False)
+        df['form'] = pd.Categorical(df['form'], 
+                                    categories=['8-K/EX-99.1','10-Q','10-K'], 
+                                    ordered=True)
+        df.sort_values(by=['cik','yr_qtr','form'], inplace=True, ascending=False)
         if df.shape[0] > 0 and output_path:
             df.to_csv(output_path, index=False)
             logger.info(f'Report saved to path: {output_path}')
@@ -684,7 +688,7 @@ def create_report(report_type, db, output_path):
         dfs = {}
         for idx,qtr in enumerate(qtrs):                 #TODO: create columns, individually, to get the best score for ACL, then Loans
             df_tmp1 = df_tmp[df_tmp['yr_qtr'] == qtr]
-            df_tmp2 = df_tmp1.sort_values(by=['cik','form']).dropna(subset=['ACL']).drop_duplicates(subset='cik')
+            df_tmp2 = df_tmp1.sort_values(by=['cik','form'], ascending=False).dropna(subset=['ACL']).drop_duplicates(subset='cik')
             df_tmp3 = df_tmp2.groupby('cik').head(1)
             df_tmp3.set_index('cik', inplace=True)
             if df_tmp3.shape[0] > 0:

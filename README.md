@@ -36,13 +36,17 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
 
 * automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
   - similarity ranking across xbrl tags
-* report: 
-  - wksheet-1 values
-  - wksheet-2 definitions (website, gaap taxonomy .xml)
 * init
+  - why are 8k, 10k consistent across firms?
   - save intermediate to `records` so less work if redo
   - check db `records` before inserting new records
   - fix cfg
+* report: 
+  - wksheet-1 why are 8k, 10k consistent across firms?
+  - wksheet-2 definitions (website, gaap taxonomy .xml)
+* run
+  - just do it
+  - email notifications
 * extractor
   - none type exceptions
   - 10+sec execution: bac

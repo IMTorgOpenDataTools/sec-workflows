@@ -26,7 +26,6 @@ import argparse
 #my libs
 from database import Database
 from utils import (
-    load_firms,
     poll_sec_edgar,
     initialize_db,
     create_report,
@@ -36,7 +35,7 @@ from utils import (
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    firms_file,
+    firms,
     log_file,
     db_file,
     tables_list,
@@ -66,7 +65,6 @@ def main(args):
     logger.info(f'Starting process in {args.mode[0]} mode')
 
     #configure
-    firms = load_firms(firms_file)
     db = Database(db_file = db_file,
                     tables_list = tables_list,
                     meta = meta,

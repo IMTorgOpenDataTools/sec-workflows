@@ -1,18 +1,18 @@
-Name,Ticker,CIK
-US Bankcorp,USB,36104
-American Express Company,AXP,4962
-Capital One Financial Corporation,COF,927628
-Fifth Third Bancorp,FITB,35527
-Huntington Bancshares Incorporated,HBAN,49196
-Keycorp,KEY,91576
-Morgan Stanley,MS,895421
-JPMorgan Chase,JPM,19617
-Citigroup Inc,C,831001
-Wells Fargo,WFC,72971
-Bank of America,BAC,70858
-PNC Bank,PNC,713676
-Goldman Sachs,GS,886982
-Truist Financial Corporation,TFC,92230
-Ally Financial Inc,ALLY,40729
-Citizens Financial Group,CFG,759944
-BankUnited,BKU,1504008
+Name,Ticker,CIK,Scope
+US Bankcorp,USB,36104,In
+American Express Company,AXP,4962,In
+Capital One Financial Corporation,COF,927628,In
+Fifth Third Bancorp,FITB,35527,In
+Huntington Bancshares Incorporated,HBAN,49196,In
+Keycorp,KEY,91576,In
+Morgan Stanley,MS,895421,In
+JPMorgan Chase,JPM,19617,In
+Citigroup Inc,C,831001,In
+Wells Fargo,WFC,72971,In
+Bank of America,BAC,70858,In
+PNC Bank,PNC,713676,In
+Goldman Sachs,GS,886982,Out
+Truist Financial Corporation,TFC,92230,Out
+Ally Financial Inc,ALLY,40729,Out
+Citizens Financial Group,CFG,759944,In
+BankUnited,BKU,1504008,Out

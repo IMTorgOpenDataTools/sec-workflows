@@ -8,6 +8,7 @@ from sqlalchemy import Table, Column, Integer, String, MetaData
 import pandas as pd
 
 from sec_edgar_extractor.extract import Extractor
+from sec_edgar_downloader import UrlComponent as uc
 
 
 # SEC limits users to no more than 10 requests per second
@@ -119,7 +120,17 @@ def load_config_account_info(file=None):
     return config
 '''
 
-
+def load_firms(file_path):
+    """Load file containing firms."""
+    df = pd.read_csv(file_path)
+    firm_recs = df.to_dict('records')
+    firms = []
+    for firm in firm_recs:
+        if firm:
+            item = uc.Firm(ticker = firm['Ticker'] )
+            item.Scope = firm['Scope']
+            firms.append( item )
+    return firms
 
 
 
@@ -134,7 +145,7 @@ db_file = './archive/test.db'
 #db_path = f'sqlite:///{db_file}'     #for testing: 'sqlite://'
 
 
-
+firms = load_firms(firms_file)
 
 #accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"
 #config = load_config_account_info(file=accounts_file)
@@ -174,6 +185,7 @@ filings = Table(
     Column('fp', String),
     Column('end', String),
     Column('filed', String),
+    Column('yr_qtr', String)
     )
 schema_filing = [col.name for col in filings.columns if col.name not in accts]
 schema_filing.extend(['acct', 'val'])       

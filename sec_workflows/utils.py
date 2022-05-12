@@ -35,6 +35,7 @@ from sec_edgar_extractor.instance_doc import Instance_Doc
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
+    firms,
     sec_edgar_downloads_path,
     MAX_RETRIES,
     SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
@@ -79,16 +80,7 @@ class TimeoutHTTPAdapter(HTTPAdapter):
 
 
 
-def load_firms(file_path):
-    """Load file containing firms."""
-    df = pd.read_csv(file_path)
-    firm_recs = df.to_dict('records')
-    firms = []
-    for firm in firm_recs:
-        if firm:
-            item = uc.Firm(ticker = firm['Ticker'] )
-            firms.append( item )
-    return firms
+
 
 
  
@@ -203,6 +195,35 @@ def scale_value(val, scale):
     return result_val
 
 
+def create_qtr(row):
+    """Create the column formatted `yr-qtr` using pd.apply(<fun>, axis=1).
+    This is based on columns `end`-of-period data, not date-`filed`, which may be
+    more than two months, later.
+    
+    """
+    fy = row['fy']
+    fp = row['fp']
+    if fy == None or fp == None:
+        qtr = row['end'].quarter
+        yr = row['end'].year
+    else:
+        yr = fy
+        if row['fp']=='FY': 
+            qtr = '4'
+        else:
+            qtr = str(row['fp']).replace('Q','')
+    return f'{yr}-{qtr}'
+
+"""
+def create_qtr(row):
+    '''Create the column formatted `yr-qtr`.'''
+    if row['fp']=='FY': 
+        fp = 4
+    else:
+        fp = str(row['fp']).replace('Q','')
+    return str(row['fy']) + '-' + str(fp)
+"""
+
 
 def initialize_db(db, firms):
     """Initialize the database with certified quarterly earnings (10-K/-Q).
@@ -300,6 +321,7 @@ def initialize_db(db, firms):
         df_wide_total = pd.merge(df_wide, df_columns, on=["cik","accn"], how="left")
         df_wide_total["filed"] = pd.to_datetime(df_wide_total["filed"])
         df_wide_total.sort_values(by="filed", ascending=False, inplace=True)
+        df_wide_total['yr_qtr'] = df_wide_total.apply(create_qtr, axis=1)
         #TODO: apply FilingMetadata before importing
         try:
             df_wide_total.to_sql(db.table_name[1]['name'], 
@@ -425,7 +447,7 @@ def get_press_releases(db, firms):
             if cik in ciks10q:
                 dftmp = df10q[(df10q['cik'] == cik) & (df10q['dt_filed'] >= fd)]
                 if dftmp.shape[0] > 0:
-                    item = dftmp.iloc[0]['yr-qtr']
+                    item = dftmp.iloc[0]['yr_qtr']
                     results.append( item )
                 else:
                     dftmp = df10q[(df10q['cik'] == cik) & (df10q['dt_filed'] < fd)].sort_values(by='dt_filed', ascending=False)
@@ -441,34 +463,12 @@ def get_press_releases(db, firms):
         return results
 
 
-    def create_qtr(row):
-        """Create the column formatted `yr-qtr`."""
-        if row['fp']=='FY': 
-            fp = 4
-        else:
-            fp = str(row['fp']).replace('Q','')
-        return str(row['fy']) + '-' + str(fp)
-
-
     def check(row):
         """Mask for selecting press release data."""
         if type(row.Type) == str and ('EX-99.1' in row.Type or 'EX-99.2' in row.Type or 'EX-99.3' in row.Type):
             return True
         else:
             return False
-
-
-    def scale_value(val, scale):
-        match scale:
-            case 'thousands':
-                result_val = val * 1000
-            case 'millions':
-                result_val = val * 1000000
-            case 'billions':
-                result_val = val * 1000000000
-            case _:
-                result_val = val
-        return result_val
 
 
     path_download = "./archive/downloads"
@@ -553,11 +553,12 @@ def get_press_releases(db, firms):
         df_10q = pd.read_sql(db.table_name[1]['name'], con=db.engine)
         if df_10q.shape[0] > 0:
             table_cols = df_10q.columns.to_list()
-            df_10q['yr-qtr'] = df_10q.apply(create_qtr, axis=1)
-            df_10q['short_cik'] = df_10q['cik'].astype(str)
-            df_8k['yr-qtr'] = get_8k_qtr(df_8k, df_10q)
-            df_8k['fy'] = df_8k['yr-qtr'].str.split(pat='-').str[0]
-            df_8k['fp'] = df_8k['yr-qtr'].str.split(pat='-').str[1].replace({'1':'Q1','2':'Q2','3':'Q3','4':'FY'})
+            #remove: df_10q['yr_qtr'] = df_10q.apply(create_qtr, axis=1)
+            #remove: df_10q['short_cik'] = df_10q['cik'].astype(str)
+            #df_8k['yr_qtr'] = get_8k_qtr(df_8k, df_10q)            #TODO: this may be too complicated
+            df_8k['yr_qtr'] = pd.DatetimeIndex(df_8k['filed']).year.astype(str) + '-Q' + pd.DatetimeIndex(df_8k['filed']).quarter.astype(str)
+            df_8k['fy'] = df_8k['yr_qtr'].str.split(pat='-').str[0]
+            df_8k['fp'] = df_8k['yr_qtr'].str.split(pat='-').str[1].replace({'1':'Q1','2':'Q2','3':'Q3','4':'FY'})
             current_cols = df_8k.columns
             select_cols = [col for col in current_cols if col in table_cols]
             df_to_commit = df_8k[select_cols]
@@ -622,20 +623,21 @@ def poll_sec_edgar(db, ciks):
     return False
     '''
 
-def create_qtr(row):
-    """Create the column formatted `yr-qtr` using pd.apply(<fun>, axis=1)."""
-    fy = row['fy']
-    fp = row['fp']
-    if fy == None or fp == None:
-        qtr = row['dt_filed'].quarter
-        yr = row['dt_filed'].year
-    else:
-        yr = fy
-        if row['fp']=='FY': 
-            qtr = '4'
-        else:
-            qtr = str(row['fp']).replace('Q','')
-    return f'{yr}-{qtr}'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -660,17 +662,16 @@ def create_report(report_type, db, output_path):
 
         # prepare dataframe
         ciks = df_long.cik.unique().tolist()
-        qtrly = ['10-K','10-Q']
-        df8k = df_long[~df_long.form.isin(qtrly) & (pd.isna(df_long['ACL'])==False)]
-        df8k['ACL_num'] = df8k['ACL'].apply(lambda x: np.abs( pd.to_numeric(x, errors='coerce')) )
-        df8k['Loans_num'] = df8k['Loans'].apply(lambda x: np.abs( pd.to_numeric(x, errors='coerce')) )
+        df_tmp = df_long[(pd.isna(df_long['ACL'])==False)]
+        df_tmp['ACL_num'] = df_tmp['ACL'].apply(lambda x: np.abs( pd.to_numeric(x, errors='coerce')) )
+        df_tmp['Loans_num'] = df_tmp['Loans'].apply(lambda x: np.abs( pd.to_numeric(x, errors='coerce')) )
         
         now = pd.Timestamp(datetime.now())
         initial_qtr = f'{now.year}-{now.quarter}'
-        df8k['yr-qtr'] = pd.DatetimeIndex(df8k['dt_filed']).year.astype(str) + '-Q' + pd.DatetimeIndex(df8k['dt_filed']).quarter.astype(str)
-        df8k.sort_values(by='dt_filed', inplace=True)
+        #df_tmp['yr_qtr'] = pd.DatetimeIndex(df_tmp['dt_filed']).year.astype(str) + '-Q' + pd.DatetimeIndex(df_tmp['dt_filed']).quarter.astype(str)
+        df_tmp.sort_values(by='dt_filed', inplace=True)
         
-        dfcnt = pd.DataFrame( df8k['yr-qtr'].value_counts() )
+        dfcnt = pd.DataFrame( df_tmp['yr_qtr'].value_counts() )
         dfcnt['date'] = pd.PeriodIndex(dfcnt.index, freq='Q').to_timestamp()
         dfcnt['qtrs'] = dfcnt.index
         dfcnt.sort_values(by='date', ascending=False, inplace=True)
@@ -681,11 +682,13 @@ def create_report(report_type, db, output_path):
         df_result['cik'] = df_long['cik'].unique()
         df_result.set_index('cik', inplace=True)
         dfs = {}
-        for qtr in qtrs:
-            df_tmp = df8k[df8k['yr-qtr'] == qtr].drop_duplicates(subset='cik')
-            df_tmp.set_index('cik', inplace=True)
-            if df_tmp.shape[0] > 0:
-                dfs[qtr] = df_tmp
+        for idx,qtr in enumerate(qtrs):                 #TODO: create columns, individually, to get the best score for ACL, then Loans
+            df_tmp1 = df_tmp[df_tmp['yr_qtr'] == qtr]
+            df_tmp2 = df_tmp1.sort_values(by=['cik','form']).dropna(subset=['ACL']).drop_duplicates(subset='cik')
+            df_tmp3 = df_tmp2.groupby('cik').head(1)
+            df_tmp3.set_index('cik', inplace=True)
+            if df_tmp3.shape[0] > 0:
+                dfs[qtr] = df_tmp3
 
         # create df by adding columns for each qtr
         meta = namedtuple('meta_record', ['accn', 'form', 'titles'])
@@ -696,17 +699,15 @@ def create_report(report_type, db, output_path):
         for key in dfs.keys():
             if dfs[key].shape[0] > 0:
 
-                recs = []
-                for row in dfs[key].to_dict('records'):
+                col = 'accn'+'|'+key
+                df_Meta[col] = None
+                for idx, row in enumerate(dfs[key].to_dict('records')):
                     rec = meta(
                         accn = row['accn'],
                         form = row['form'],
                         titles= row['titles']
                     )
-                    recs.append(rec)
-                df_Meta['accn'+'|'+key] = recs
-                #df_Meta = df_Meta.join(meta, how='outer') 
-                #df_Meta.rename(columns={'accn':'accn'+'|'+key}, inplace=True)
+                    df_Meta[col].iloc[idx] = rec
 
                 acl = dfs[key]['ACL_num']
                 df_ACL = df_ACL.join(acl, how='outer') 
@@ -722,9 +723,19 @@ def create_report(report_type, db, output_path):
                 df_Ratio.rename(columns={'Ratio':'Ratio'+'|'+key}, inplace=True)
 
         # format output
-        firms = [(36104, 'USB'), (4962, 'AXP'), (927628, 'COF'), (35527, 'FITB'), (49196, 'HBAN'), (91576, 'KEY'), (895421, 'MS'), (19617, 'JPM'), (831001, 'C'), (72971, 'WFC'), (70858, 'BAC'), (713676, 'PNC'), (886982, 'GS'), (92230, 'TFC'), (40729, 'ALLY'), (759944, 'CFG'), (1504008, 'BKU')]
         df_ACL['cik'] = df_ACL.index
-        bank = df_ACL['cik'].apply(lambda x: [item[1] for item in firms if str(item[0])==x][0] )
+        def format_bank_name(val):
+            for firm in firms:
+                if str(firm.get_info('cik')) == val:
+                    name = firm.get_info('name')
+                    if name.isupper():
+                        name = name.title()
+                    if firm.Scope == 'In':
+                        return f"{name} - {firm.get_info('ticker')}"
+                    else:
+                        return f"(Out Of Scope) {name} - {firm.get_info('ticker')}"
+
+        bank = df_ACL['cik'].apply(lambda x: format_bank_name(x))
         df_ACL.insert(0, "Bank", bank)
         df_ACL.drop(columns='cik', inplace=True)
 
@@ -745,6 +756,7 @@ def create_report(report_type, db, output_path):
 
 
         def create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df, df_meta, qtrs, hdr_title):
+            # config
             url = 'www.sec.gov/Archives/edgar/data/{cik}/{accn_wo_dash}/{accn}-index.htm'
             hdr_rows = 2
             time_periods = len(qtrs)
@@ -753,29 +765,37 @@ def create_report(report_type, db, output_path):
             data_row_start = row_start + hdr_rows
             data_row_end = row_end + hdr_rows
 
+            # header
             worksheet.set_column(col_start, col_end - 1, 11.5)          #header requires `-1` because it is inclusive
             worksheet.set_row(row_start, 20)
-            worksheet.set_row(row_start+1, 20)
-            worksheet.merge_range(row_start,col_start, row_start,col_end-1, hdr_title, header_format)
+            worksheet.set_row(row_start + 1, 20)
+            worksheet.merge_range(row_start, col_start, row_start, col_end-1, hdr_title, header_format)
             for idx, qtr in enumerate( qtrs ):
                 col = col_start + idx
                 worksheet.write_string(1, col, qtr, header_format)
 
+            # data cells
             for idxC, col in enumerate( range(col_start, col_end)):
                 for idxR, data_row in enumerate( range(data_row_start, data_row_end)):
+                    # prepare
                     raw_value = df.iloc[idxR, idxC + df_col_offset]
-                    meta_value = {'cik': df_meta.index.tolist()[idxR], 
-                                    'accn': df_meta.iloc[idxR, idxC].accn, 
-                                    'form': df_meta.iloc[idxR, idxC].form, 
-                                    'title': ast.literal_eval(df_meta.iloc[idxR, idxC].titles)[0][1],
-                                    'xbrl': ast.literal_eval(df_meta.iloc[idxR, idxC].titles)[0][2]
-                                    }
+                    rec = df_meta.iloc[idxR, idxC]
+                    titles = ast.literal_eval(df_meta.iloc[idxR, idxC].titles) if (rec and rec.titles) else None
+                    meta_value = {'cik':'None', 'accn':'None', 'form':'None', 'title':'None', 'xbrl':'None'}
+                    if rec:
+                        meta_value['cik'] = df_meta.index.tolist()[idxR]
+                        meta_value['accn'] = rec.accn
+                        meta_value['form'] = rec.form
+                        if titles:
+                            meta_value['title'] = ast.literal_eval(rec.titles)[0][1]
+                            meta_value['xbrl'] = ast.literal_eval(rec.titles)[0][2]
                     if raw_value > 1:
                         value = raw_value / 1000000
                         data_format = workbook.add_format({'num_format': '#,##0.0', 'border':1})
                     else:
                         value = raw_value
                         data_format = workbook.add_format({'num_format': '0.000', 'border':1})
+                    # write
                     if pd.isna(value): 
                         url_filled = url.format(cik=meta_value['cik'], accn_wo_dash=meta_value['accn'].replace('-',''), accn=meta_value['accn'])
                         comment = f'Form: {meta_value["form"]} \nTitle: {meta_value["title"]} \nXBRL: {meta_value["xbrl"]} \nconfidence: 0 \ndoc url: {url_filled}'
@@ -791,7 +811,7 @@ def create_report(report_type, db, output_path):
         # xlsx report
         file_path = output_path / 'report_acl_acct.xlsx'
         workbook = xlsxwriter.Workbook(file_path)
-        worksheet = workbook.add_worksheet()
+        worksheet = workbook.add_worksheet('Large Banks')
 
         banks = df_ACL.Bank.tolist()
         col_start = 2
@@ -808,21 +828,33 @@ def create_report(report_type, db, output_path):
             'font_size': 14,
             'align': 'center',
             'valign': 'vcenter'})
+        index_format = workbook.add_format({
+            'text_wrap': True,
+            'bold': 1,
+            'border': 1,
+            'bg_color': '#060a7d',
+            'font_color': 'white',
+            'align': 'right'
+        })
         missing_format = workbook.add_format({
+            'border': 1,
             'align': 'center',
             'font_color': 'gray'
             })
         comment_format = {
             'visible': False,
             'width': 200,
-            'height': 125,
+            'height': 100,
             'color': '#f7f7f5'
             }
 
-        for idx, ticker in enumerate(banks):
+        # index rows with bank names
+        worksheet.set_column(1, 1, 35)
+        for idx, name in enumerate(banks):
             row = idx + 2
-            worksheet.write_string(row, 1, ticker, header_format)
+            worksheet.write_string(row, 1, name,  index_format)
 
+        # sections
         create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df_ACL, df_Meta, qtrs, hdr_title='Allowance for Credit Losses')
         df_col_offset = 0
         create_xlsx_section(worksheet, row_start, section2_col_start, df_col_offset, df_Loans, df_Meta, qtrs, hdr_title='Loans')
@@ -842,8 +874,8 @@ def create_report(report_type, db, output_path):
         cols.pop(0)   #remove 'Bank'
         df = pd.melt(df_ACL, id_vars='Bank', value_vars=cols)
         df.rename(columns={'value':'ACL'}, inplace=True)
-        df['yr-qtr'] = df['variable'].str.split('|').str[1]
-        df['dt_filed'] = pd.PeriodIndex(df['yr-qtr'], freq='Q').to_timestamp()
+        df['yr_qtr'] = df['variable'].str.split('|').str[1]
+        df['dt_filed'] = pd.PeriodIndex(df['yr_qtr'], freq='Q').to_timestamp()
         df['ACL'] = df.ACL.astype(float)
 
         years = 2
@@ -878,7 +910,7 @@ def create_report(report_type, db, output_path):
         ciks = df_long.cik.unique().tolist()
         qtrly = ['10-K','10-Q']
         days_from_last_qtr = [0, 90, 180, 270, 360]
-        df_long['yr-qtr'] = df_long.apply(create_qtr, axis=1)
+        df_long['yr_qtr'] = df_long.apply(create_qtr, axis=1)
 
         df_result = pd.DataFrame()
         df_result['cik'] = df_long['cik'].unique()
@@ -889,13 +921,13 @@ def create_report(report_type, db, output_path):
             prev_qtr = f'{prev.year}-{prev.quarter}'
             # try 10-K/-Q first
             # mask = ~df_long['form'].isin( qtrly ) if days == 90 else df_long['form'].isin( qtrly )
-            # df_long[ (df_long['yr-qtr'] == '2021-4') & (~df_long['form'].isin( qtrly ))]
+            # df_long[ (df_long['yr_qtr'] == '2021-4') & (~df_long['form'].isin( qtrly ))]
             mask = df_long['form'].isin( qtrly )
-            df_10k_qtr = df_long[ (df_long['yr-qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False) & (mask)]
+            df_10k_qtr = df_long[ (df_long['yr_qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False) & (mask)]
             ciks_10k = df_10k_qtr.cik.unique()
             if len(ciks_10k) < len(ciks):
                 mask = ~df_long['form'].isin( qtrly )
-                df_8k_qtr = df_long[ (df_long['yr-qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False)  & (mask)]
+                df_8k_qtr = df_long[ (df_long['yr_qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False)  & (mask)]
                 if len(ciks_10k) > 0:
                     s8k = set(df_8k_qtr.cik)
                     s10k = set(df_10k_qtr.cik)

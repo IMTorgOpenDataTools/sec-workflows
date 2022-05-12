@@ -34,10 +34,19 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
 
 ## TODO
 
-* run with all banks and get new accounting policy report
-* create config with topic (ACL) and list of associated xbrl tags
+* automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
+  - similarity ranking across xbrl tags
+* report: 
+  - wksheet-1 values
+  - wksheet-2 definitions (website, gaap taxonomy .xml)
 * init
-  - save to `records` so less work if redo
+  - save intermediate to `records` so less work if redo
   - check db `records` before inserting new records
+  - fix cfg
+* extractor
+  - none type exceptions
+  - 10+sec execution: bac
+  - bac Loans
+  - confidence
 
 

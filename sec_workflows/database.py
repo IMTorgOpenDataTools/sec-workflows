@@ -22,9 +22,7 @@ from datetime import date
 import requests
 
 #my libs
-from utils import (
-    remove_list_dups,
-)
+#from utils import (remove_list_dups,)
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (

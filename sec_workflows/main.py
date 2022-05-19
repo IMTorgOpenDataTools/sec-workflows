@@ -10,24 +10,25 @@ __license__ = "MIT"
 
 #third-party
 import pandas as pd
-import sqlalchemy as sql                     #create_engine
+import sqlalchemy as sql                     
 from sqlalchemy import Table, Column, Integer, String, MetaData
-import sqlalchemy_utils as sql_util         #database_exists, create_database
+import sqlalchemy_utils as sql_util 
 
 #built-in
 import os
 from pathlib import Path
 import logging
 import time
-from datetime import date
+from datetime import date, datetime, timedelta
 import requests
 import argparse
 
 #my libs
 from database import Database
+from report import Report
 from utils import (
+    send_notification,
     poll_sec_edgar,
-    create_report,
     reset_files
 )
 import sys
@@ -58,8 +59,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(args):
-    """Application entrypoint
-    """
+    """Application entrypoint"""
     logger.info(f'Starting process in {args.mode[0]} mode')
 
     #configure
@@ -67,6 +67,10 @@ def main(args):
                     tables_list = tables_list,
                     meta = meta,
                     logger = logger
+                    )
+
+    report = Report(db = db, 
+                    output_path=OUTPUT_REPORT_PATH
                     )
 
     #check db file
@@ -77,35 +81,55 @@ def main(args):
 
     #process
     match args.mode[0]:
+
         case 'init':
-            api = db.initialize_db(firms)
-            scrape = db.get_press_releases(firms)
+            years = timedelta(weeks = 52)
+            start_date = datetime.now().date() - years
+            after_date = start_date.strftime("%Y-%m-%d") 
+
+            api = db.get_quarterly_statements(firms, after_date)
+            scrape = db.get_earnings_releases(firms, after_date)
             format_10q = db.format_raw_quarterly_records()
             format_8k = db.format_raw_earnings_records()
 
             if all([api, scrape, format_10q, format_8k]): 
-                create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
+                report.create_report(type='long')
                 logger.info(f'Database initialization complete')
             else:
                 logger.info(f'No databae update necessary')
+
         case 'run':
             while True:
-                changed_data = poll_sec_edgar(db, ciks)     #TODO: update with with firms
-                if changed_data:
-                    print("sec edgar changed")
-                    db.update_database()
-                    print("database updated")
-                    create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
-                    print("report created")
+                days = timedelta(days = 3)
+                start_date = datetime.now().date() - days
+                after_date = start_date.strftime("%Y-%m-%d")
+
+                changed_firms = poll_sec_edgar(db, firms, after_date)
+                if len(list(changed_firms.values())) > 0:
+                    print('sec edgar changed')
+                    if changed_firms['10kq']:
+                        firm_list = list(changed_firms['10kq'])
+                        api = db.get_quarterly_statements(firm_list, after_date)
+                        format_10q = db.format_raw_quarterly_records()
+                        print('database updated')
+                    if changed_firms['8k']:
+                        firm_list = list(changed_firms['8k'])
+                        scrape = db.get_earnings_releases(firm_list, after_date)
+                        format_8k = db.format_raw_earnings_records()
+                        print('database updated')
+                    report.create_report(type='long')
+                    send_notification()
                 else:
-                    print("no change to server")
+                    print('no change to server')
                 secs = MINUTES_BETWEEN_CHECKS * 60
                 time.sleep(secs)
+
         case 'report':
-            create_report(report_type='long', db=db, output_path=OUTPUT_REPORT_PATH)
-            create_report(report_type='accounting_policy', db=db, output_path=OUTPUT_REPORT_PATH)
+            report.create_report(report_type='long')
+            report.create_report(report_type='accounting_policy')
             #create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
             #create_report(report_type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
+
         case 'RESET_FILES':
             reset_files()
 

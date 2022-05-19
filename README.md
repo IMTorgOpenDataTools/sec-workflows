@@ -34,15 +34,16 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
 
 ## TODO
 
-* init
-  - save intermediate to `records` so less work if redo
-  - check db `records` before inserting new records
-  - fix cfg
+
+* run
+  - request update page
+  - determine if any target firms were updated
+  - use firms with new db call (select call for 8k or 10k) with latest point in time
+  - db is updated
+  - report is updated
+  - email notifications
 * automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
   - similarity ranking across xbrl tags
-* run
-  - just do it
-  - email notifications
 * extractor
   - Exception: 'NoneType' object is not iterable
   - 10+sec execution: bac

@@ -9,6 +9,7 @@ __license__ = "MIT"
 
 
 #third-party
+from flask import after_this_request
 import pandas as pd
 import numpy as np
 import sqlalchemy as sql                     #create_engine
@@ -112,12 +113,12 @@ class Database:
             return False
 
 
-    def initialize_db(self, firms):
+    def get_quarterly_statements(self, firms, after):
         """Initialize the database with certified quarterly earnings (10-K/-Q).
         """
         # configure
         FILE_TYPES = ['10-K', '10-Q']
-        AFTER = "2022-01-01"
+        AFTER = after                           #"2022-01-01"
         path_download = "./archive/downloads"
 
         # check if data exists
@@ -136,7 +137,7 @@ class Database:
             for firm in firms:
                 for filing in FILE_TYPES:
                     TICKER = firm.get_info()['ticker']
-                    urls = dl.get_urls(filing,
+                    urls = dl.get_metadata(filing,
                                         TICKER, 
                                         after=AFTER
                                         )   
@@ -208,6 +209,7 @@ class Database:
         return True
 
 
+    '''
     def populate_quarterly_filings(self):
         """Import quarterly (10-K/-Q) data from SEC EDGAR API."""
         pass
@@ -217,8 +219,10 @@ class Database:
         """Download, extract, and import earnings (8-K_ data 
         from SEC EDGAR API."""
         pass
+    '''
 
-    def get_press_releases(self, firms):
+
+    def get_earnings_releases(self, firms, after):
         """Get press releases (8-K/EX-99.*) and extract account values.
         """
 
@@ -229,6 +233,7 @@ class Database:
             else:
                 return False
 
+        AFTER = after           #"2022-01-01"
         path_download = "./archive/downloads"
         # check if data exists
         stmt = "SELECT * FROM " + self.table_name[0]["name"] + " WHERE form like '8-%'"
@@ -241,9 +246,9 @@ class Database:
             dl = Downloader(path_download)
             for firm in firms:
                 TICKER = firm.get_info()['ticker']
-                urls = dl.get_urls("8-K",
+                urls = dl.get_metadata("8-K",
                                     TICKER, 
-                                    after="2021-01-01")   
+                                    after = AFTER)   
             df = dl.filing_storage.get_dataframe(mode='document')
             sel1 = df[(df['short_cik'].isin(ciks)) 
                         & (df['file_type'] == '8-K') 

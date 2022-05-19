@@ -4,8 +4,10 @@ Module Docstring
 """
 from asyncio.log import logger
 from collections import namedtuple
+import subprocess
 import ast
 from enum import unique
+
 import pandas as pd
 import numpy as np
 import sqlalchemy as sql
@@ -35,6 +37,7 @@ from sec_edgar_extractor.instance_doc import Instance_Doc
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
+    emails_file,
     firms,
     sec_edgar_downloads_path,
     MAX_RETRIES,
@@ -80,6 +83,19 @@ class TimeoutHTTPAdapter(HTTPAdapter):
 
 
 
+
+def send_notification():
+    """Send notification that report is updated."""
+
+    subject = 'SEC Report Update'
+    body = "Dear Sir/Ma'am, this is a notification that the SEC earnings report is updated.  You can find it in the following shared drive: `\hqfile01\sec`."
+
+    df_emails = pd.read_csv(emails_file)
+    emails = df_emails['address'].tolist()
+
+    for email in emails:
+        test = subprocess.Popen(["mailx", "-s", subject, email, "<", body], stdout=subprocess.PIPE)
+        output = test.communicate()[0]
 
 
 
@@ -151,7 +167,7 @@ def get_recent_financial_release(tickers, ciks):
     dl = Downloader(sec_edgar_downloads_path)
     for bank in banks:
         ticker = bank.get_info()['ticker']
-        urls = dl.get_urls("8-K",
+        urls = dl.get_metadata("8-K",
                             ticker,
                             after = start.strftime("%Y-%m-%d")
                             )
@@ -222,43 +238,62 @@ def create_qtr(row):
 
 
 
-def poll_sec_edgar(db, ciks):
-    """Check for changes in SEC EDGAR DB, 
-    and make updates to sqlite3 when appropriate.  TODO:<<< no, updates are done else where
+def poll_sec_edgar(db, firms, after_date):
+    """Check for changes in SEC EDGAR DB, and return corresponding firms"""
+
+    after = pd.Timestamp(after_date).__str__()    #'2022-03-01 00:00:00'
+
+    client = requests.Session()
+    client.mount("http://", HTTPAdapter(max_retries=retries))
+    client.mount("https://", HTTPAdapter(max_retries=retries))
+
+    form_updates = {'8k':set(), 
+                    '10kq':set()
+                    }
+    for firm in firms:
+        cik = firm._cik
+        if cik:
+            recent = api_request(session=client, type='firm_details', cik=cik, acct=None)
+            recs = []
+            keys = recent.keys()
+            for item in range(len(recent['filingDate'])):
+                rec = {val:recent[val][item] for val in keys}
+                recs.append(rec)
+
+            df = pd.DataFrame.from_dict(recs)
+            df['filingDate_t'] = pd.to_datetime(df['filingDate'])
+            df_tmp1 = df[df['filingDate_t'] > after]                #ensure `after` is changed for testing
+            if df_tmp1.shape[0] > 0:
+                for row in df_tmp1.to_dict('records'):
+                    if row['form'] in ['8-K']:
+                        form_updates['8k'].add(firm)
+                    if row['form'] in ['10-K', '10-Q']:
+                        form_updates['10kq'].add(firm)
+    return form_updates
+
+
+
+def reset_files(mode='intermediate_files'):
+    """Remove specific files from the `downloades` directory.
+    'intermediate_files' - created during extraction process
+    'directory_structure' - all files, dirs created during download and extraction process
     """
-    today = pd.Timestamp(date.today()).__str__()    #'2022-03-01 00:00:00'
-    form_types = ['8-K','10-K','10-Q']
+    match mode:
+        case 'intermediate_files':
+            dir_path = './archive/downloads/sec-edgar-filings'
+            acct_names = ['ACL', 'ALLL', 'PCL', 'Loans', 'ChargeOffs', 'ACLpctLoan', 'Charge Offs', 'ACLpct Loan']
 
-    result_df = []
-    for cik in ciks:
-        recent = api_request(type='firm_details', cik=cik, acct=None)
-        recs = []
-        keys = recent.keys()
-        for item in range(len(recent['filingDate'])):
-            rec = {val:recent[val][item] for val in keys}
-            recs.append(rec)
-
-        df = pd.DataFrame.from_dict(recs)
-        df['filingDate_t'] = pd.to_datetime(df['filingDate'])
-        df_tmp1 = df[df['filingDate_t'] > today]
-        df_tmp2 = df_tmp1[df_tmp1['form'].isin(form_types)]
-        if df_tmp2.shape[0] > 0:
-            df_tmp2['cik'] = cik
-            result_df.append(df_tmp2)
-
-    return result_df
-    '''
-    for df in result_df:
-        for form in range(df_tmp2.shape[0]):
-            if df_tmp2['form'] == '8-K':
-                #download/extract 8-K
-                #df_tmp2['accessionNumber'] 
-                return True 
-            else:
-                #update 10-K/10-Q
-                return True
-    return False
-    '''
+            p = Path(dir_path)
+            files = list(p.glob('**/*'))
+            files_to_del = []
+            for file in files:
+                if not hasattr(file, 'stem'): continue
+                if file.stem in acct_names:
+                    files_to_del.append(file)
+            [file.unlink() for file in files_to_del]
+            return True
+        case 'directory_structure':
+            pass
 
 
 
@@ -274,11 +309,7 @@ def poll_sec_edgar(db, ciks):
 
 
 
-
-
-
-
-
+'''
 def create_report(report_type, db, output_path):
     """Create the final report from db query."""
 
@@ -507,9 +538,9 @@ def create_report(report_type, db, output_path):
 
 
     def trend(df_ACL, output_path):
-        '''Create trend lines
+        """Create trend lines
         TODO: this seems to re-create df_long?  maybe just use that?
-        '''
+        """
         cols = df_ACL.columns.tolist()
         cols.pop(0)   #remove 'Bank'
         df = pd.melt(df_ACL, id_vars='Bank', value_vars=cols)
@@ -633,7 +664,7 @@ def create_report(report_type, db, output_path):
         page_title_text = 'ACL Trend Report'
         title_text = '<placeholder>'
         text = '<placeholder>'
-        html = f'''
+        html = f"""
             <html>
                 <head>
                     <title>{page_title_text}</title>
@@ -646,7 +677,7 @@ def create_report(report_type, db, output_path):
                     {df_long.to_html()}
                 </body>
             </html>
-            '''
+            """
         file_path = dir_path / 'report_trend.html'
         with open(file_path, 'w') as f:
             f.write(html)
@@ -717,3 +748,4 @@ def reset_files(mode='intermediate_files'):
             return True
         case 'directory_structure':
             pass
+'''

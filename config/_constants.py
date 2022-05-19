@@ -78,6 +78,7 @@ sec_edgar_downloads_path = './archive'
 log_file = './archive/process.log'
 db_file = './archive/test.db'
 #db_path = f'sqlite:///{db_file}'     #for testing: 'sqlite://'
+emails_file = './config/emails.csv'
 
 
 firms = load_firms(firms_file)

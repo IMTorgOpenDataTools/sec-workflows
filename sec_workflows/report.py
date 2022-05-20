@@ -118,18 +118,28 @@ class Report:
         dfcnt.sort_values(by='date', ascending=False, inplace=True)
         qtrs = dfcnt.qtrs.tolist()
 
-        # get df for each qtr
+        # get df for each qtr for each account topic (VERY IMPORTANT)
         df_result = pd.DataFrame()
         df_result['cik'] = df_long['cik'].unique()
         df_result.set_index('cik', inplace=True)
-        dfs = {}
-        for idx,qtr in enumerate(qtrs):                 #TODO: create columns, individually, to get the best score for ACL, then Loans
+
+        dfsACL = {}
+        for idx,qtr in enumerate(qtrs):
             df_tmp1 = df_tmp[df_tmp['yr_qtr'] == qtr]
             df_tmp2 = df_tmp1.sort_values(by=['cik','form'], ascending=True).dropna(subset=['ACL']).drop_duplicates(subset='cik')
             df_tmp3 = df_tmp2.groupby('cik').head(1)
             df_tmp3.set_index('cik', inplace=True)
             if df_tmp3.shape[0] > 0:
-                dfs[qtr] = df_tmp3
+                dfsACL[qtr] = df_tmp3
+
+        dfsLoans = {}
+        for idx,qtr in enumerate(qtrs):
+            df_tmp1 = df_tmp[df_tmp['yr_qtr'] == qtr]
+            df_tmp2 = df_tmp1.sort_values(by=['cik','form'], ascending=True).dropna(subset=['Loans']).drop_duplicates(subset='cik')
+            df_tmp3 = df_tmp2.groupby('cik').head(1)
+            df_tmp3.set_index('cik', inplace=True)
+            if df_tmp3.shape[0] > 0:
+                dfsLoans[qtr] = df_tmp3
 
         # create df for metadata and each metric by adding appropriate columns for each qtr
         meta = namedtuple('meta_record', ['cik', 'accn', 'form', 'titles'])
@@ -137,13 +147,13 @@ class Report:
         df_ACL = df_result.copy(deep=True)
         df_Loans = df_result.copy(deep=True)
         df_Ratio = df_result.copy(deep=True)
-        for key in dfs.keys():
-            if dfs[key].shape[0] > 0:
+        for key in dfsACL.keys():
+            if dfsACL[key].shape[0] > 0:
 
                 col = 'meta'+'|'+key
                 df_Meta[col] = None
-                dfs[key]['cik'] = dfs[key].index
-                for row in dfs[key].to_dict('records'):
+                dfsACL[key]['cik'] = dfsACL[key].index
+                for row in dfsACL[key].to_dict('records'):
                     rec = meta(
                         cik = str(row['cik']),
                         accn = row['accn'],
@@ -152,11 +162,11 @@ class Report:
                     )
                     df_Meta[col].loc[rec.cik] = rec
 
-                acl = dfs[key]['ACL_num']
+                acl = dfsACL[key]['ACL_num']
                 df_ACL = df_ACL.join(acl, how='outer') 
                 df_ACL.rename(columns={'ACL_num':'ACL'+'|'+key}, inplace=True)
 
-                loans = dfs[key]['Loans_num']
+                loans = dfsLoans[key]['Loans_num']
                 df_Loans = df_Loans.join(loans, how='outer') 
                 df_Loans.rename(columns={'Loans_num':'Loans'+'|'+key}, inplace=True)
 

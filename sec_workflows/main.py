@@ -111,14 +111,14 @@ def main(args):
                         firm_list = list(changed_firms['10kq'])
                         api = db.get_quarterly_statements(firm_list, after_date)
                         format_10q = db.format_raw_quarterly_records()
-                        print('database updated')
+                        print('database updated 10kq')
                     if changed_firms['8k']:
                         firm_list = list(changed_firms['8k'])
                         scrape = db.get_earnings_releases(firm_list, after_date)
                         format_8k = db.format_raw_earnings_records()
-                        print('database updated')
+                        print('database updated 8k')
                     report.create_report(type='long')
-                    send_notification()
+                    #send_notification()
                 else:
                     print('no change to server')
                 secs = MINUTES_BETWEEN_CHECKS * 60

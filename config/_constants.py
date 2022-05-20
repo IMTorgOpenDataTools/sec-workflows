@@ -61,16 +61,17 @@ def load_firms(file_path):
     firm_recs = df.to_dict('records')
     firms = []
     for firm in firm_recs:
-        if firm:
-            item = uc.Firm(ticker = firm['Ticker'] )
-            item.Scope = firm['Scope']
-            firms.append( item )
+        #if firm['Scope']=='In':
+        item = uc.Firm(ticker = firm['Ticker'] )
+        item.Scope = firm['Scope']
+        firms.append( item )
     return firms
 
 
 
 
-firms_file = './config/ciks_test.csv'
+firms_file = './config/ciks.csv'
+firms = load_firms(firms_file)
 #accounts_file = './config/accounts.csv'
 #accounts_file = './config/Firm_Account_Info.csv'
 
@@ -81,7 +82,6 @@ db_file = './archive/test.db'
 emails_file = './config/emails.csv'
 
 
-firms = load_firms(firms_file)
 
 #accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"
 #config = load_config_account_info(file=accounts_file)

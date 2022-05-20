@@ -14,6 +14,7 @@ import xlsxwriter
 import pdfkit
 
 import pandas as pd
+import numpy as np
 import sqlalchemy as sql                     #create_engine
 from sqlalchemy import Table, Column, Integer, String, MetaData
 import sqlalchemy_utils as sql_util         #database_exists, create_database
@@ -40,7 +41,8 @@ from utils import (
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    accts
+    accts,
+    firms
 )
 
 
@@ -62,11 +64,12 @@ class Report:
                 result = self.report_long(self.output_path)
             case 'accounting_policy':
                 df_long = self.report_long() 
-                result = self.report_accounting(df_long, dir_path)
+                list_of_df_tables = self.report_accounting_policy_preparation(df_long)
+                result = self.report_accounting_policy_completion(list_of_df_tables)
             case 'trend':
                 df_long = self.report_long()
                 #result = template(df_long, dir_path)
-                df_ACL = self.report_accounting(df_long, dir_path)
+                df_ACL = self.report_accounting_policy_preparation(df_long)
                 result = self.trend(df_ACL, dir_path)
             case 'validate':
                 df_long = self.report_long()
@@ -76,12 +79,13 @@ class Report:
 
 
 
-    def report_long(self, output_path):
+    def report_long(self, output_path=None):
         """TODO: move to db query.  It is necessary for everything, so just make it automatic."""
         df = self.db.query_database(table_name='filings')
         df['dt_filed'] = pd.to_datetime(df.filed)
+        form_categories = ['10-Q', '10-K', '8-K/EX-99.3', '8-K/EX-99.2', '8-K/EX-99.1']         #NOTE: precedence used for sorting and selecting data
         df['form'] = pd.Categorical(df['form'], 
-                                    categories=['8-K/EX-99.1','10-Q','10-K'], 
+                                    categories=form_categories, 
                                     ordered=True)
         df.sort_values(by=['cik','yr_qtr','form'], inplace=True, ascending=False)
         if df.shape[0] > 0 and output_path:
@@ -92,8 +96,10 @@ class Report:
         return df
 
 
-    def report_accounting(df_long, output_path=False):
-        """Report quarterly accounts only using 8-K extractions."""
+    def report_accounting_policy_preparation(self, df_long):
+        """Report preparation for accounting policy by returning a list of 
+        dataframes, one for each metric.
+        """
 
         # prepare dataframe
         ciks = df_long.cik.unique().tolist()
@@ -119,14 +125,14 @@ class Report:
         dfs = {}
         for idx,qtr in enumerate(qtrs):                 #TODO: create columns, individually, to get the best score for ACL, then Loans
             df_tmp1 = df_tmp[df_tmp['yr_qtr'] == qtr]
-            df_tmp2 = df_tmp1.sort_values(by=['cik','form'], ascending=False).dropna(subset=['ACL']).drop_duplicates(subset='cik')
+            df_tmp2 = df_tmp1.sort_values(by=['cik','form'], ascending=True).dropna(subset=['ACL']).drop_duplicates(subset='cik')
             df_tmp3 = df_tmp2.groupby('cik').head(1)
             df_tmp3.set_index('cik', inplace=True)
             if df_tmp3.shape[0] > 0:
                 dfs[qtr] = df_tmp3
 
-        # create df by adding columns for each qtr
-        meta = namedtuple('meta_record', ['accn', 'form', 'titles'])
+        # create df for metadata and each metric by adding appropriate columns for each qtr
+        meta = namedtuple('meta_record', ['cik', 'accn', 'form', 'titles'])
         df_Meta = df_result.copy(deep=True)
         df_ACL = df_result.copy(deep=True)
         df_Loans = df_result.copy(deep=True)
@@ -134,15 +140,17 @@ class Report:
         for key in dfs.keys():
             if dfs[key].shape[0] > 0:
 
-                col = 'accn'+'|'+key
+                col = 'meta'+'|'+key
                 df_Meta[col] = None
-                for idx, row in enumerate(dfs[key].to_dict('records')):
+                dfs[key]['cik'] = dfs[key].index
+                for row in dfs[key].to_dict('records'):
                     rec = meta(
+                        cik = str(row['cik']),
                         accn = row['accn'],
                         form = row['form'],
                         titles= row['titles']
                     )
-                    df_Meta[col].iloc[idx] = rec
+                    df_Meta[col].loc[rec.cik] = rec
 
                 acl = dfs[key]['ACL_num']
                 df_ACL = df_ACL.join(acl, how='outer') 
@@ -157,12 +165,14 @@ class Report:
                 df_Ratio = df_Ratio.join(ratio, how='outer') 
                 df_Ratio.rename(columns={'Ratio':'Ratio'+'|'+key}, inplace=True)
 
-        # format output
+        df_Meta = df_Meta.iloc[::-1]
+
+        # format output index labels
         df_ACL['cik'] = df_ACL.index
         def format_bank_name(val):
             for firm in firms:
                 if str(firm.get_info('cik')) == val:
-                    name = firm.get_info('name')
+                    name = firm.get_info('name').replace('\\','').replace('\/','')
                     if name.isupper():
                         name = name.title()
                     if firm.Scope == 'In':
@@ -174,23 +184,24 @@ class Report:
         df_ACL.insert(0, "Bank", bank)
         df_ACL.drop(columns='cik', inplace=True)
 
+        # apply minor corrections
         cols = df_ACL.columns.tolist()
-        cols.pop(0)   #remove 'Bank'
-        # if incorrect, then just make NaN
+        cols.remove('Bank')                                  
         for col in cols:
             df_ACL.loc[df_ACL[col] < 100, col] = np.nan
-        #df_ACL = df_ACL[df_ACL['Bank']!='BKU']              #TODO:change once updated, but check first
 
-        df_list = [df_ACL, df_Ratio]
-        df_result = df_result.join(df_list[0])
-        df_result = df_result.join(df_list[1])
-
-        #df_long[df_long.cik == '91576']
-        file_path = output_path / 'report_acl_acct.csv'
-        df_result.to_csv(file_path)
+        list_of_df_tables = [df_Meta, df_ACL, df_Loans, df_Ratio]
+        return list_of_df_tables
 
 
-        def create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df, df_meta, qtrs, hdr_title):
+
+    def report_accounting_policy_completion(self, list_of_df_tables, output_path=False):
+        """Complete report creation for accounting policy by outputing an excel file."""
+
+        df_Meta, df_ACL, df_Loans, df_Ratio = list_of_df_tables
+        qtrs = [col.split('meta|')[1] for col in df_Meta.columns]
+
+        def create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df, df_meta, acct_topic, qtrs, hdr_title):
             # config
             url = 'www.sec.gov/Archives/edgar/data/{cik}/{accn_wo_dash}/{accn}-index.htm'
             hdr_rows = 2
@@ -215,15 +226,18 @@ class Report:
                     # prepare
                     raw_value = df.iloc[idxR, idxC + df_col_offset]
                     rec = df_meta.iloc[idxR, idxC]
-                    titles = ast.literal_eval(df_meta.iloc[idxR, idxC].titles) if (rec and rec.titles) else None
+                    tmp_titles = ast.literal_eval(rec.titles) if (rec and rec.titles) else None
+                    selection = [item for item in tmp_titles if item[0]==acct_topic] if tmp_titles else None
+                    titles = selection[0] if selection else None
                     meta_value = {'cik':'None', 'accn':'None', 'form':'None', 'title':'None', 'xbrl':'None'}
                     if rec:
-                        meta_value['cik'] = df_meta.index.tolist()[idxR]
+                        meta_value['cik'] = rec.cik           #df_meta.index.tolist()[idxR]
                         meta_value['accn'] = rec.accn
                         meta_value['form'] = rec.form
                         if titles:
-                            meta_value['title'] = ast.literal_eval(rec.titles)[0][1]
-                            meta_value['xbrl'] = ast.literal_eval(rec.titles)[0][2]
+                            meta_value['title'] = titles[1]
+                            meta_value['xbrl'] = titles[2]
+                    # formatting
                     if raw_value > 1:
                         value = raw_value / 1000000
                         data_format = workbook.add_format({'num_format': '#,##0.0', 'border':1})
@@ -243,8 +257,9 @@ class Report:
                         worksheet.write_comment(data_row, col, comment, comment_format)
 
 
-        # xlsx report
-        file_path = output_path / 'report_acl_acct.xlsx'
+        # xlsx report output
+        #file_path = self.output_path / 'report_acl_acct.xlsx'
+        file_path = './archive/report/report_acl_acct.xlsx'
         workbook = xlsxwriter.Workbook(file_path)
         worksheet = workbook.add_worksheet('Large Banks')
 
@@ -289,19 +304,19 @@ class Report:
             row = idx + 2
             worksheet.write_string(row, 1, name,  index_format)
 
-        # sections
-        create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df_ACL, df_Meta, qtrs, hdr_title='Allowance for Credit Losses')
+        # create sections
+        create_xlsx_section(worksheet, row_start, col_start, df_col_offset, df_ACL, df_Meta, acct_topic='ACL', qtrs=qtrs, hdr_title='Allowance for Credit Losses')
         df_col_offset = 0
-        create_xlsx_section(worksheet, row_start, section2_col_start, df_col_offset, df_Loans, df_Meta, qtrs, hdr_title='Loans')
-        create_xlsx_section(worksheet, row_start, section3_col_start, df_col_offset, df_Ratio, df_Meta, qtrs, hdr_title='Coverage')
+        create_xlsx_section(worksheet, row_start, section2_col_start, df_col_offset, df_Loans, df_Meta, acct_topic='Loans', qtrs=qtrs, hdr_title='Loans')
+        create_xlsx_section(worksheet, row_start, section3_col_start, df_col_offset, df_Ratio, df_Meta, acct_topic='ACL', qtrs=qtrs, hdr_title='Coverage')
         workbook.close()
-
 
         # return
         return df_ACL
 
 
-    def trend(df_ACL, output_path):
+
+    def trend(self, df_ACL, output_path):
         '''Create trend lines
         TODO: this seems to re-create df_long?  maybe just use that?
         '''
@@ -333,80 +348,7 @@ class Report:
 
 
 
-    def report_accounting_certified(df_long, output_path=False):
-        """FUTURE: Report of quarterly accounts using strict stability requirements.
-
-        Comparability requirements (currently deficient):
-        * 8-K data should only be used when certified 10-K/-Q data is not available (quarterly is incorrect because of inconsistency in reporting).  ​
-        * Certified 10-K/-Q data should be both stable and most-current (this may not be true for some accounts). ​
-        * Accounts between firms should be 'reasonably' comparable with descriptions documented (references needed).​
-
-        """
-        ciks = df_long.cik.unique().tolist()
-        qtrly = ['10-K','10-Q']
-        days_from_last_qtr = [0, 90, 180, 270, 360]
-        df_long['yr_qtr'] = df_long.apply(create_qtr, axis=1)
-
-        df_result = pd.DataFrame()
-        df_result['cik'] = df_long['cik'].unique()
-        df_result.set_index('cik', inplace=True)
-        dfs = {}
-        for days in days_from_last_qtr:
-            prev = pd.Timestamp(datetime.now())  -  pd.to_timedelta( days, unit='d')
-            prev_qtr = f'{prev.year}-{prev.quarter}'
-            # try 10-K/-Q first
-            # mask = ~df_long['form'].isin( qtrly ) if days == 90 else df_long['form'].isin( qtrly )
-            # df_long[ (df_long['yr_qtr'] == '2021-4') & (~df_long['form'].isin( qtrly ))]
-            mask = df_long['form'].isin( qtrly )
-            df_10k_qtr = df_long[ (df_long['yr_qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False) & (mask)]
-            ciks_10k = df_10k_qtr.cik.unique()
-            if len(ciks_10k) < len(ciks):
-                mask = ~df_long['form'].isin( qtrly )
-                df_8k_qtr = df_long[ (df_long['yr_qtr'] == prev_qtr) & (pd.isna(df_long['ACL'])==False)  & (mask)]
-                if len(ciks_10k) > 0:
-                    s8k = set(df_8k_qtr.cik)
-                    s10k = set(df_10k_qtr.cik)
-                    diff = list( s8k.difference(s10k) )
-                    df_10k_tmp = df_10k_qtr.drop_duplicates(subset=['cik'], inplace=False)
-                    df_8k_tmp = df_8k_qtr[df_8k_qtr.cik.isin(diff)].drop_duplicates(subset=['cik'], inplace=False)
-                    df_qtr = df_10k_tmp.append(df_8k_tmp)    #, ignore_index=True
-                else:
-                    df_qtr = df_8k_qtr
-            else:
-                df_qtr = df_10k_qtr
-
-            df_qtr.drop_duplicates(subset=['cik'], inplace=True)
-            df_qtr.set_index('cik', inplace=True)
-            dfs[prev_qtr] = df_qtr
-
-        df_ACL = df_result.copy(deep=True)
-        df_Loans = df_result.copy(deep=True)
-        df_Ratio = df_result.copy(deep=True)
-        for key in dfs.keys():
-            if dfs[key].shape[0] > 0:
-                acl = np.abs( dfs[key]['ACL'] )
-                df_ACL = df_ACL.join(acl, how='outer') 
-                df_ACL.rename(columns={'ACL':'ACL'+'|'+key}, inplace=True)
-
-                loans = dfs[key]['Loans']
-                df_Loans = df_Loans.join(loans, how='outer') 
-                df_Loans.rename(columns={'Loans':'Loans'+'|'+key}, inplace=True)
-
-                ratio = acl / loans
-                ratio.name = 'Ratio'
-                df_Ratio = df_Ratio.join(ratio, how='outer') 
-                df_Ratio.rename(columns={'Ratio':'Ratio'+'|'+key}, inplace=True)
-
-        df_list = [df_ACL, df_Ratio]
-        df_result = df_result.join(df_list[0])
-        df_result = df_result.join(df_list[1])
-        #df_long[df_long.cik == '91576']
-        file_path = './archive/report/report_acl_acct.csv'
-        df_result.to_csv(file_path, index=False)
-        return df_ACL
-
-
-    def template(df_long, dir_path=False):
+    def template(self, df_long, dir_path=False):
         start = date.today() + timedelta(days=30)
         end = date.today() - timedelta(days=365*3)
         plt = (ggplot(aes(x='dt_filed', y='ACL'), df_long) 

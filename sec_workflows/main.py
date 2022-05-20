@@ -125,10 +125,10 @@ def main(args):
                 time.sleep(secs)
 
         case 'report':
-            report.create_report(report_type='long')
-            report.create_report(report_type='accounting_policy')
-            #create_report(report_type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
-            #create_report(report_type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
+            report.create_report(type='long')
+            report.create_report(type='accounting_policy')
+            #create_report(type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
+            #create_report(type='validate', db=db, output_path=OUTPUT_REPORT_PATH)
 
         case 'RESET_FILES':
             reset_files()

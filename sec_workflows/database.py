@@ -172,31 +172,38 @@ class Database:
                 fp = df_doc.value[df_doc['name']=='DocumentFiscalPeriodFocus'].values[0]
                 end = df_doc.value[df_doc['name']=='DocumentPeriodEndDate'].values[0]
                 for acct_key, acct_rec in accts:
+                    del item, rec
                     try:
                         xbrl_tag = acct_rec.xbrl                        #<<< TODO:try a list of similar xbrls until one hits
-                        item = df[(df['concept'] == xbrl_tag )               
+                        subset = df[(df['concept'] == xbrl_tag )               
                                     & (df['dimension'] == '' ) 
                                     & (df['value_context']== '' )
                                     & (df['start'] < start )
                                     & (pd.isna(df['end']) == True )
-                                    ].sort_values(by='start', ascending=False).to_dict('records')[0]
+                                    ]
+                        if subset.shape[0] > 0:
+                            item = subset.sort_values(by='start', ascending=False).to_dict('records')[0]        #TODO: progressive subsetting if dimesion is not empty
+                        else:
+                            print(f'XBRL Tag not found for: {ticker}')
+                            continue
+                        rec = RecordMetadata(
+                                cik = cik,
+                                accn = accn,
+                                form = filing.file_type,
+                                account = acct_key,
+                                value = item['value_concept'],                  
+                                account_title = acct_rec.table_account,
+                                xbrl_tag = xbrl_tag,
+                                fy = fy,
+                                fp = fp,
+                                end = end,
+                                filed = filing.file_date
+                        )
+                        recs.append(rec)
                     except Exception as e:
                         print(e)
                         continue
-                    rec = RecordMetadata(
-                            cik = cik,
-                            accn = accn,
-                            form = filing.file_type,
-                            account = acct_key,
-                            value = item['value_concept'],                  
-                            account_title = acct_rec.table_account,
-                            xbrl_tag = xbrl_tag,
-                            fy = fy,
-                            fp = fp,
-                            end = end,
-                            filed = filing.file_date
-                    )
-                    recs.append(rec)
+                    
 
             # save to db
             df = pd.DataFrame(recs, columns=RecordMetadata._fields)

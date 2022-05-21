@@ -172,7 +172,7 @@ class Database:
                 fp = df_doc.value[df_doc['name']=='DocumentFiscalPeriodFocus'].values[0]
                 end = df_doc.value[df_doc['name']=='DocumentPeriodEndDate'].values[0]
                 for acct_key, acct_rec in accts:
-                    del item, rec
+                    item = rec = None
                     try:
                         xbrl_tag = acct_rec.xbrl                        #<<< TODO:try a list of similar xbrls until one hits
                         subset = df[(df['concept'] == xbrl_tag )               

@@ -5,9 +5,9 @@ Pull data from SEC EDGAR and maintain in a database.
 
 ## Quick Start
 
-Add the config file: `config/Firm_Account_Info.csv`.  Ensusre `config/ciks.csv` is appropriate.
+Ensusre `config/ciks.csv` is appropriate.
 
-Ensure `IMTorg/sec-edgar-downloader` is available.
+Ensure `IMTorg/sec-edgar-downloader` and `IMTorg/sec-edgar-extractor` are available.
 
 ```
 mkdir .lib
@@ -19,6 +19,17 @@ python /workspaces/Prj-sec_workflows/sec_workflows/main.py init
 pipenv install .lib/sec-edgar-extractor-dev/.
 pipenv install -r .lib/sec-edgar-extractor-dev/requirements.txt 
 ```
+
+Install [`tidy` for linux](https://www.html-tidy.org/), source code is [here](https://github.com/htacg/tidy-html5).
+
+Prepare the following variables:
+
+* Firm_Account_Info.csv
+* ciks.csv
+* `touch archive/process.log`
+* db file
+* emails file
+
 
 
 or 

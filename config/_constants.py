@@ -29,7 +29,7 @@ DEFAULT_TIMEOUT = 5
 
 MINUTES_BETWEEN_CHECKS = 0.10
 QUARTERS_IN_TABLE = 6
-OUTPUT_REPORT_PATH = './archive/report/long_output.csv'
+OUTPUT_REPORT_PATH = './archive/report/'                #long_output.csv'
 
 
 

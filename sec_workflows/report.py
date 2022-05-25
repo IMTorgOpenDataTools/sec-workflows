@@ -53,7 +53,12 @@ class Report:
 
     def __init__(self, db, output_path):
         self.db = db
-        self.output_path = output_path
+        valid_path = Path(output_path)
+        if valid_path.is_dir():
+            self.output_path = valid_path
+        else:
+            print(f'Dir does not exist: {output_path}')
+            raise IOError
 
 
     def create_report(self, type):
@@ -73,14 +78,14 @@ class Report:
                 result = self.trend(df_ACL, dir_path)
             case 'validate':
                 df_long = self.report_long()
-                result = self.validate(df_long, dir_path)
+                result = self.validate(df_long, self.output_path)
 
         return result
 
 
-
     def report_long(self, output_path=None):
         """TODO: move to db query.  It is necessary for everything, so just make it automatic."""
+        report_name = 'long_output.csv'
         df = self.db.query_database(table_name='filings')
         df['dt_filed'] = pd.to_datetime(df.filed)
         form_categories = ['10-Q', '10-K', '8-K/EX-99.3', '8-K/EX-99.2', '8-K/EX-99.1']         #NOTE: precedence used for sorting and selecting data
@@ -89,7 +94,8 @@ class Report:
                                     ordered=True)
         df.sort_values(by=['cik','yr_qtr','form'], inplace=True, ascending=False)
         if df.shape[0] > 0 and output_path:
-            df.to_csv(output_path, index=False)
+            report_path = output_path / report_name
+            df.to_csv(report_path, index=False)
             logger.info(f'Report saved to path: {output_path}')
         else:
             logger.info(f'No data available to report')
@@ -407,21 +413,27 @@ class Report:
         return True
 
 
-    def validate(df_long, dir_path=False):
+    def validate(self, df_long, dir_path=False):
         """Validate 8-K earnings against associated 10-K/-Q quarterly statements.
         If not exact, then these numbers should be close.
         """
+        suffixes = ('_10q', '_8k')
         df_qtrly = df_long[df_long['form'].isin(['10-K','10-Q'])]
         df_8k = df_long[~df_long['form'].isin(['10-K','10-Q'])]
-        df_tmp = pd.merge(df_qtrly, df_8k, on=['fy','fp','cik'], how='left')
+        df_tmp = pd.merge(df_qtrly, df_8k, on=['fy','fp','cik'], how='left', suffixes=suffixes)
         for acct in accts:
-            left = acct+'_x'
-            right = acct+'_y'
-            df_tmp[left] = df_tmp[left].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True)
-            df_tmp[right] = df_tmp[right].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True)
-            df_tmp[acct+'_diff'] = df_tmp[left] - df_tmp[right]
+            left = acct+suffixes[0]
+            right = acct+suffixes[1]
+            df_tmp[left] = df_tmp[left].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True).abs()
+            df_tmp[right] = df_tmp[right].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True).abs()
+            col_diff = {'_spacer'+acct: ' - ',
+                        '_'+left: df_tmp[left],
+                        '_'+right: df_tmp[right],
+                        'diff_'+acct: df_tmp[left] - df_tmp[right]
+                        }
+            df_tmp = df_tmp.assign(**col_diff)
             #df_tmp.drop(columns=[left, right], inplace=True)
         df_valid = df_tmp
-        file_path = dir_path / 'report_validation.csv'
+        file_path = Path(dir_path) / 'report_validation.csv'
         df_valid.to_csv(file_path, index=False)
         return True

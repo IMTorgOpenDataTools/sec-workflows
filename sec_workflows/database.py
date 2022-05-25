@@ -26,7 +26,7 @@ from asyncio.log import logger
 from pathlib import Path
 import logging
 import time
-from datetime import date
+from datetime import date, timedelta
 import requests
 
 #my libs
@@ -282,8 +282,8 @@ class Database:
                 items = extractor.execute_extract_process(doc=doc, ticker=ticker)
                 items_key = list(items.keys())[0]
                 for acct, val in items[items_key].items():
-                    if type(val) == str: 
-                        continue
+                    if type(val) == str: continue
+                    if doc.Type != extractor.config[ticker].accounts[acct].exhibits: continue
                     scale = extractor.config[ticker].accounts[acct].scale
                     rec = RecordMetadata(
                                     cik = str(doc_meta['short_cik']),
@@ -377,8 +377,9 @@ class Database:
 
             if df_10q.shape[0] > 0:
                 table_cols = df_10q.columns.to_list()
-                #df_8k['yr_qtr'] = get_8k_qtr(df_8k, df_10q)            #TODO: this may be too complicated
-                df_8k['yr_qtr'] = pd.DatetimeIndex(df_8k['filed']).year.astype(str) + '-Q' + pd.DatetimeIndex(df_8k['filed']).quarter.astype(str)
+                #df_8k['yr_qtr'] = get_8k_qtr(df_8k, df_10q)                            #TODO: this may be too complicated
+                report_qtr = pd.DatetimeIndex( df_8k['filed'] ) - timedelta(90)         #get previous quarter
+                df_8k['yr_qtr'] = report_qtr.year.astype(str) + '-Q' + report_qtr.quarter.astype(str)
                 df_8k['fy'] = df_8k['yr_qtr'].str.split(pat='-').str[0]
                 df_8k['fp'] = df_8k['yr_qtr'].str.split(pat='-').str[1].replace({'1':'Q1','2':'Q2','3':'Q3','4':'FY'})
                 current_cols = df_8k.columns

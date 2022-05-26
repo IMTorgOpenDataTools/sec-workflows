@@ -99,7 +99,8 @@ def main(args):
                 logger.info(f'No databae update necessary')
 
         case 'run':
-            while True:
+            loop = True             #setup based on desired loop style
+            while loop:
                 days = timedelta(days = 3)
                 start_date = datetime.now().date() - days
                 after_date = start_date.strftime("%Y-%m-%d")
@@ -123,6 +124,7 @@ def main(args):
                     print('no change to server')
                 secs = MINUTES_BETWEEN_CHECKS * 60
                 time.sleep(secs)
+                loop = False
 
         case 'report':
             report.create_report(type='long')

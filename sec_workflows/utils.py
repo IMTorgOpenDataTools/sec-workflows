@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-Module Docstring
+Convenience functions used throughout application.
 """
-from asyncio.log import logger
-from collections import namedtuple
-import subprocess
-import ast
-from enum import unique
+__author__ = "Jason Beach"
+__version__ = "0.1.0"
+__license__ = "MIT"
+
+#third-party
+from sec_edgar_downloader import Downloader
+from sec_edgar_downloader import UrlComponent as uc
+from sec_edgar_extractor.extract import Extractor
+from sec_edgar_extractor.instance_doc import Instance_Doc
 
 import pandas as pd
 import numpy as np
@@ -15,39 +19,28 @@ from plotnine import *
 from mizani.breaks import date_breaks
 from mizani.formatters import date_format
 
+#builtin
+import logging
+#from asyncio.log import logger
+from collections import namedtuple
+import subprocess
+from subprocess import PIPE, STDOUT
+from enum import unique
+
 from pathlib import Path
-import time
 from datetime import datetime, date, timedelta
-import re
-
-import xlsxwriter
-import pdfkit
-import base64
-
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import http
 
-from sec_edgar_downloader import Downloader
-from sec_edgar_downloader import UrlComponent as uc
-from sec_edgar_extractor.extract import Extractor
-from sec_edgar_extractor.instance_doc import Instance_Doc
-
+#libs
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    emails_file,
-    firms,
-    sec_edgar_downloads_path,
+    FILE_EMAILS,
+    DIR_SEC_DOWNLOADS,
     MAX_RETRIES,
-    SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL,
     DEFAULT_TIMEOUT,
-    MINUTES_BETWEEN_CHECKS,
-    QUARTERS_IN_TABLE,
-    accts,
-    RecordMetadata,
-    FilingMetadata
 )
 
 url_firm_details = "https://data.sec.gov/submissions/CIK{}.json"
@@ -82,23 +75,45 @@ class TimeoutHTTPAdapter(HTTPAdapter):
 
 
 
+class Logger:
+
+    def __init__(self, log_file):
+        self.log_file = Path(log_file)
+
+    def create_logger(self):
+        """Create logger and associated file (if necessary)."""
+        if not self.log_file.parent.is_dir():
+            self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        if not self.log_file.is_file():
+            open(self.log_file, 'x').close()
+
+        logging.basicConfig(filename=self.log_file, 
+                            encoding='utf-8', 
+                            level=logging.INFO, 
+                            format='%(asctime)s %(message)s')
+        logger = logging.getLogger(__name__)
+        return logger
+
 
 
 def send_notification():
-    """Send notification that report is updated."""
-
-    subject = 'SEC Report Update'
-    body = "Dear Sir/Ma'am, this is a notification that the SEC earnings report is updated.  You can find it in the following shared drive: `\hqfile01\sec`."
-
-    df_emails = pd.read_csv(emails_file)
+    """Send email notification that report is updated."""
+    subject = 'CBDC Tracker Update'
+    body = b'''Dear Sir/Ma'am, this is a notification that the SEC Earnings report is updated. 
+            You can find it in the following shared drive: 
+            `\hqfile01\sec_edgar\sec_edgar\`.
+            '''
+    df_emails = pd.read_csv(FILE_EMAILS)
     emails = df_emails['address'].tolist()
-
-    for email in emails:
-        test = subprocess.Popen(["mailx", "-s", subject, email, "<", body], stdout=subprocess.PIPE)
-        output = test.communicate()[0]
-
-    return True
-
+    checks = []
+    bashCommand = ["mailx", "-s", subject, *emails]
+    try:
+        p = subprocess.Popen(bashCommand, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        result = p.communicate(input=body)[0]
+        checks.append(result)
+    except:
+        print("failed to send email notification.")
+    return checks
 
 
  
@@ -124,7 +139,7 @@ def api_request(session, type, cik, acct):
             filled_url = url_company_concept.format(long_cik, acct)
             keys = ('units','USD')
         case _:
-            logger.warning(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
+            print(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
             exit()
 
     #make request
@@ -135,7 +150,7 @@ def api_request(session, type, cik, acct):
                 items = edgar_resp.json()[keys[0]][keys[1]]
                 return items
     else:
-        logger.warning(f'edgar response returned status code {edgar_resp.status_code}')
+        print(f'edgar response returned status code {edgar_resp.status_code}')
         return None
 
 
@@ -167,7 +182,7 @@ def get_recent_financial_release(tickers, ciks):
 
     start = date.today() - timedelta(days=90)
     banks = [uc.Firm(ticker=bank[1]) for bank in tickers]
-    dl = Downloader(sec_edgar_downloads_path)
+    dl = Downloader(DIR_SEC_DOWNLOADS)
     for bank in banks:
         ticker = bank.get_info()["ticker"]
         urls = dl.get_metadata("8-K",

@@ -1,8 +1,13 @@
-import pytest
+#!/usr/bin/env python3
+"""
+Test database engine functionality.
+"""
+__author__ = "Jason Beach"
+__version__ = "0.1.0"
+__license__ = "MIT"
 
-import os
-import shutil
-from bs4 import BeautifulSoup
+
+import pytest
 import requests
 
 from sec_workflows.utils import (
@@ -17,8 +22,8 @@ from sec_workflows.utils import (
 
 
 def test_send_notification():
-    check = send_notification()
-    assert check == True
+    checks = send_notification()
+    assert checks != []
 
 
 def test_api_request():

@@ -1,24 +1,42 @@
 #!/usr/bin/env python3
 """
-Module Docstring
+Declare constants and initialize configurations.
 """
-import math
-from collections import namedtuple
-import pandas as pd
-from sqlalchemy import Table, Column, Integer, String, MetaData
-#from sqlalchemy.orm import declarative_base
-#from sqlalchemy.orm import relationship
+__author__ = "Jason Beach"
+__version__ = "0.1.0"
+__license__ = "MIT"
 
-#Base = declarative_base()
-
-
+#third-party
 from sec_edgar_extractor.extract import Extractor
 from sec_edgar_downloader import UrlComponent as uc
 
+#builtin
+from collections import namedtuple
+import pandas as pd
+from sqlalchemy import Table, Column, Integer, String, MetaData
 
-# SEC limits users to no more than 10 requests per second
-# Sleep 0.1s between each request to prevent rate-limiting
-# Source: https://www.sec.gov/developer
+
+
+
+
+
+# file managmeent
+FILE_EMAILS = './config/emails.csv'
+FILE_FIRMS = './config/ciks_test.csv'
+DIR_REPORTS = './archive/report'
+
+DIR_SEC_DOWNLOADS = './archive'
+FILE_LOG = './archive/process.log'
+FILE_DB = './archive/prod.db'
+#FILE_DB = f'sqlite:///{db_file}'     #for in-memory testing: 'sqlite://'
+
+
+# request management
+"""
+SEC limits users to no more than 10 requests per second
+Sleep 0.1s between each request to prevent rate-limiting
+Source: https://www.sec.gov/developer
+"""
 SEC_EDGAR_RATE_LIMIT_SLEEP_INTERVAL = 0.1
 
 # Number of times to retry a request to sec.gov
@@ -29,10 +47,11 @@ DEFAULT_TIMEOUT = 5
 
 MINUTES_BETWEEN_CHECKS = 0.10
 QUARTERS_IN_TABLE = 6
-OUTPUT_REPORT_PATH = './archive/report/'                #long_output.csv'
 
 
 
+
+# database schema
 AccountRecord = namedtuple(
     "AccountRecord",
     [   'name',
@@ -55,6 +74,9 @@ FirmRecord = namedtuple(
 )
 
 
+
+
+# initialize firms
 def load_firms(file_path):
     """Load file containing firms."""
     df = pd.read_csv(file_path)
@@ -67,31 +89,20 @@ def load_firms(file_path):
         firms.append( item )
     return firms
 
+LIST_ALL_FIRMS = load_firms(FILE_FIRMS)
 
 
 
-firms_file = './config/ciks.csv'
-firms = load_firms(firms_file)
-#accounts_file = './config/accounts.csv'
-#accounts_file = './config/Firm_Account_Info.csv'
-
-sec_edgar_downloads_path = './archive'
-log_file = './archive/process.log'
-db_file = './archive/test.db'
-#db_path = f'sqlite:///{db_file}'     #for testing: 'sqlite://'
-emails_file = './config/emails.csv'
-
-
-
-#accts = load_accounts(accounts_file)    #accts = {'NotesReceivableGross': 'Total_Loans'}"
-#config = load_config_account_info(file=accounts_file)
+# initialize extractor
 extractor = Extractor(save_intermediate_files=True)
 config = extractor.config
 tmp = []
 [tmp.extend(item.accounts.keys()) for item in config.values()]
-accts = list(set(tmp))
+LIST_ALL_ACCOUNTS= list(set(tmp))
 
 
+
+# initialize schema
 meta = MetaData()
 
 records = Table(
@@ -117,7 +128,7 @@ filings = Table(
     Column('cik', String, primary_key = True), 
     Column('accn', String, primary_key = True), 
     Column('form', String, primary_key = True),
-    *(Column(acct, Integer()) for acct in accts ),
+    *(Column(acct, Integer()) for acct in LIST_ALL_ACCOUNTS),
     Column('titles', String),
     Column('fy', String),
     Column('fp', String),
@@ -125,11 +136,11 @@ filings = Table(
     Column('filed', String),
     Column('yr_qtr', String)
     )
-schema_filing = [col.name for col in filings.columns if col.name not in accts]
+schema_filing = [col.name for col in filings.columns if col.name not in LIST_ALL_ACCOUNTS]
 schema_filing.extend(['acct', 'val'])       
 FilingMetadata = namedtuple("FilingMetadata", schema_filing) 
 
-tables_list = [
+LIST_ALL_TABLES = [
                 {'name': 'records', 'table': records, 'schema': schema_records}, 
                 {'name': 'filings', 'table': filings, 'schema': schema_filing}
                 ]

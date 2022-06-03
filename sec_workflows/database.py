@@ -6,8 +6,6 @@ __author__ = "Jason Beach"
 __version__ = "0.1.0"
 __license__ = "MIT"
 
-
-
 #third-party
 from flask import after_this_request
 import pandas as pd
@@ -30,22 +28,15 @@ from datetime import date, timedelta
 import requests
 
 #my libs
-from utils import (
-    scale_value
-)
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
+sys.path.append(Path('sec_workflows').absolute().as_posix() )
 from utils import (
-    create_qtr
+    create_qtr,
+    scale_value
 )
 from _constants import (
-    db_file,
-    tables_list,
-    MINUTES_BETWEEN_CHECKS,
-    QUARTERS_IN_TABLE,
-    accts,
-    meta,
-    filings,
+    LIST_ALL_ACCOUNTS,
     RecordMetadata,
     FilingMetadata
 )
@@ -57,24 +48,34 @@ class Database:
     """Database class."""
 
     def __init__(self, db_file, tables_list, meta, logger):
-        self.db_file = db_file
+        self.db_file = Path(db_file)
         self.db_path = f'sqlite:///{db_file}' 
         self.table_name = tables_list
         self.meta = meta
         self.engine = None
         self.logger = logger
 
+        check_file = self.check_db_file()
+        if check_file:
+            pass
+        else:
+            self.logger.warning('Fail db creation.')
+
 
     def check_db_file(self):
         """Check the database file exists."""
-        path = Path(self.db_file)
-        if not path.is_file():
-            self.logger.warning('Database file not found.')
-            #TODO:create db file
+        path = self.db_file
+        try:
+            if not path.is_file():
+                self.logger.warning('Database file not found.  Creating now.')
+                open(path, 'x').close()
+                return True
+            else:
+                self.logger.warning('Database file exists.')
+                return True
+        except:
+            self.logger.warning('Path does not exist.')
             return False
-        else:
-            self.logger.warning('Database file exists.')
-            return True
 
 
     def check_db_schema(self):
@@ -82,21 +83,26 @@ class Database:
         engine = sql.create_engine(self.db_path, echo=True)
         self.engine = engine
         self.meta.reflect(bind=engine)
-        if not sql_util.database_exists(engine.url):
-            check_tables = []
-            for tbl in self.table_name:
-                check = sql.inspect(engine).has_table(tbl['name']) 
-                check_tables.append(check)
-                if not all(check_tables):
-                    self.logger.warning('Database does not exist.  Making it now.')     
-                    self.meta.create_all(engine)                                                                         
-                    self.logger.warning('Database created.') 
-        else:
-            self.logger.info('Database table and schema correct.')
-            check = self.validate_db_records()
-            if check:
-                self.logger.info('Database table are populated.')
-        return None
+        try:
+            if not sql_util.database_exists(engine.url):
+                check_tables = []
+                for tbl in self.table_name:
+                    check = sql.inspect(engine).has_table(tbl['name']) 
+                    check_tables.append(check)
+                    if not all(check_tables):
+                        self.logger.warning('Database tables do not exist.  Making it them now.')     
+                        self.meta.create_all(engine)                                                                         
+                        self.logger.warning('Database tables created.') 
+            else:
+                self.logger.info('Database table and schema correct.')
+                check = self.validate_db_records()
+                if check:
+                    self.logger.info('Database table are populated.')
+            return True
+        except:
+            self.logger.warning('The `check_db_schema` failed.')
+            return False
+
 
 
     def validate_db_records(self):
@@ -105,8 +111,11 @@ class Database:
         for tbl in self.table_name:
             stmt = sql.select( tbl['table'] )
             with sql.orm.Session(self.engine) as session:
-                row = session.execute(stmt).first()
-                populated.append( row )
+                try:
+                    row = session.execute(stmt).first()
+                    populated.append( row )
+                except:
+                    return False
         if all(populated):
             return True
         else:

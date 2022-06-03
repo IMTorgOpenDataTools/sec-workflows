@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-Module Docstring
+Report class for generating all reports.
 """
 __author__ = "Jason Beach"
 __version__ = "0.1.0"
 __license__ = "MIT"
-
-
-
 
 #third-party
 import xlsxwriter
@@ -41,8 +38,8 @@ from utils import (
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    accts,
-    firms
+    LIST_ALL_ACCOUNTS,
+    LIST_ALL_FIRMS
 )
 
 
@@ -186,7 +183,7 @@ class Report:
         # format output index labels
         df_ACL['cik'] = df_ACL.index
         def format_bank_name(val):
-            for firm in firms:
+            for firm in LIST_ALL_FIRMS:
                 if str(firm.get_info('cik')) == val:
                     name = firm.get_info('name').replace('\\','').replace('\/','')
                     if name.isupper():
@@ -421,7 +418,7 @@ class Report:
         df_qtrly = df_long[df_long['form'].isin(['10-K','10-Q'])]
         df_8k = df_long[~df_long['form'].isin(['10-K','10-Q'])]
         df_tmp = pd.merge(df_qtrly, df_8k, on=['fy','fp','cik'], how='left', suffixes=suffixes)
-        for acct in accts:
+        for acct in LIST_ALL_ACCOUNTS:
             left = acct+suffixes[0]
             right = acct+suffixes[1]
             df_tmp[left] = df_tmp[left].replace(r'^([A-Za-z]|[0-9]|_)+$', np.NaN, regex=True).abs()

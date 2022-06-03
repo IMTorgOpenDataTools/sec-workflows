@@ -6,8 +6,6 @@ __author__ = "Jason Beach"
 __version__ = "0.1.0"
 __license__ = "MIT"
 
-
-
 #third-party
 import pandas as pd
 import sqlalchemy as sql                     
@@ -17,7 +15,6 @@ import sqlalchemy_utils as sql_util
 #built-in
 import os
 from pathlib import Path
-import logging
 import time
 from datetime import date, datetime, timedelta
 import requests
@@ -27,6 +24,7 @@ import argparse
 from database import Database
 from report import Report
 from utils import (
+    Logger,
     send_notification,
     poll_sec_edgar,
     reset_files
@@ -34,24 +32,26 @@ from utils import (
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    firms,
-    log_file,
-    db_file,
-    tables_list,
-    MINUTES_BETWEEN_CHECKS,
-    QUARTERS_IN_TABLE,
-    OUTPUT_REPORT_PATH,
+    FILE_LOG,
+    FILE_DB,
     meta,
-    filings,
-    FilingMetadata
+    LIST_ALL_FIRMS,
+    LIST_ALL_TABLES,
+    MINUTES_BETWEEN_CHECKS,
+    DIR_REPORTS,
 )
 
 
 #configure
-#Path(log_file).mkdir(parents=True, exist_ok=True)
-logging.basicConfig(filename=log_file, encoding='utf-8', level=logging.INFO, format='%(asctime)s %(message)s')
-logger = logging.getLogger(__name__)
-
+logger = Logger(FILE_LOG).create_logger()
+db = Database(db_file = FILE_DB,
+                tables_list = LIST_ALL_TABLES,
+                meta = meta,
+                logger = logger
+                )
+report = Report(db = db, 
+                output_path=DIR_REPORTS
+                )
 
 
 
@@ -62,22 +62,13 @@ def main(args):
     """Application entrypoint"""
     logger.info(f'Starting process in {args.mode[0]} mode')
 
-    #configure
-    db = Database(db_file = db_file,
-                    tables_list = tables_list,
-                    meta = meta,
-                    logger = logger
-                    )
-
-    report = Report(db = db, 
-                    output_path=OUTPUT_REPORT_PATH
-                    )
-
-    #check db file
+    #check db file and schema
     check_db = db.check_db_file()
-
-    #check db schema
     check_schema = db.check_db_schema()
+    checks = [check_db, check_schema]
+    if not all(checks):
+        logger.warning("DB checks failed.")
+        exit()
 
     #process
     match args.mode[0]:
@@ -87,8 +78,8 @@ def main(args):
             start_date = datetime.now().date() - years
             after_date = start_date.strftime("%Y-%m-%d") 
 
-            api = db.get_quarterly_statements(firms, after_date)
-            scrape = db.get_earnings_releases(firms, after_date)
+            api = db.get_quarterly_statements(LIST_ALL_FIRMS, after_date)
+            scrape = db.get_earnings_releases(LIST_ALL_FIRMS, after_date)
             format_10q = db.format_raw_quarterly_records()
             format_8k = db.format_raw_earnings_records()
 
@@ -99,13 +90,13 @@ def main(args):
                 logger.info(f'No databae update necessary')
 
         case 'run':
-            loop = True             #setup based on desired loop style
+            loop = True                                                                 #setup based on desired loop style
             while loop:
                 days = timedelta(days = 3)
                 start_date = datetime.now().date() - days
                 after_date = start_date.strftime("%Y-%m-%d")
 
-                changed_firms = poll_sec_edgar(db, firms, after_date)
+                changed_firms = poll_sec_edgar(db, LIST_ALL_FIRMS, after_date)
                 if len(list(changed_firms.values())) > 0:
                     print('sec edgar changed')
                     if changed_firms['10kq']:
@@ -129,7 +120,7 @@ def main(args):
         case 'report':
             report.create_report(type='long')
             report.create_report(type='accounting_policy')
-            #create_report(type='trend', db=db, output_path=OUTPUT_REPORT_PATH)
+            #create_report(type='trend', db=db, output_path=DIR_REPORTS)
             report.create_report(type='validate')
 
         case 'RESET_FILES':

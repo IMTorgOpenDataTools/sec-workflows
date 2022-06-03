@@ -271,8 +271,8 @@ class Report:
 
 
         # xlsx report output
-        #file_path = self.output_path / 'report_acl_acct.xlsx'
-        file_path = './archive/report/report_acl_acct.xlsx'
+        file_path = self.output_path / 'report_acl_acct.xlsx'
+        #file_path = './archive/report/report_acl_acct.xlsx'
         workbook = xlsxwriter.Workbook(file_path)
         worksheet = workbook.add_worksheet('Large Banks')
 

@@ -98,11 +98,13 @@ class Logger:
 
 def send_notification():
     """Send email notification that report is updated."""
-    subject = 'CBDC Tracker Update'
-    body = b'''Dear Sir/Ma'am, this is a notification that the SEC Earnings report is updated. 
-            You can find it in the following shared drive: 
-            `\hqfile01\sec_edgar\sec_edgar\`.
-            '''
+    subject = 'SEC 8-K Update'
+    body = b'''
+    Dear Sir / Ma'am, 
+    This is a notification that the SEC Earnings report is updated. 
+    You can find it in the following network drive: 
+        `\hqfile01\sec_edgar\sec_edgar\`
+    '''
     df_emails = pd.read_csv(FILE_EMAILS)
     emails = df_emails['address'].tolist()
     checks = []

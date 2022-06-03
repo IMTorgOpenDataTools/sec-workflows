@@ -109,8 +109,8 @@ def main(args):
                         scrape = db.get_earnings_releases(firm_list, after_date)
                         format_8k = db.format_raw_earnings_records()
                         print('database updated 8k')
-                    report.create_report(type='long')
-                    #send_notification()
+                    report.create_report(type='accounting_policy')
+                    send_notification()
                 else:
                     print('no change to server')
                 secs = MINUTES_BETWEEN_CHECKS * 60

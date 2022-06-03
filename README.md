@@ -56,12 +56,18 @@ or
 
 ## Development
 
-To be used in any venv, port the depdendencies to requirements.txt: `pipenv run pip freeze > requirements.txt`
+To be used in any venv, 
+* port the depdendencies to requirements.txt: `pipenv run pip freeze > requirements.txt`
+* remove the two `sec-edgar-*` module entries
+* add to venv with: `pip install -r requirements.txt`
 
 
 
 ## TODO
 
+* confidence level: 
+  - create for extractor
+  - update worflow
 * automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
   - similarity ranking across xbrl tags
 * extractor
@@ -72,3 +78,8 @@ To be used in any venv, port the depdendencies to requirements.txt: `pipenv run 
   - wksheet-2 definitions (website, gaap taxonomy .xml)
 * report: 
   - wksheet-2 definitions (website, gaap taxonomy .xml)
+
+
+## References
+
+* [cmdln python debugger, pdb](https://qxf2.com/blog/debugging-in-python-using-pytest-set_trace/)

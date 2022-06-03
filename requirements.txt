@@ -56,8 +56,8 @@ pytz==2022.1
 rapidfuzz==2.0.7
 requests==2.27.1
 scipy==1.8.1
--e git+https://github.com/IMTorgOpenDataTools/sec-workflows.git@85bb4ce92783c0d9cb92681f1f7c6979f6cb5eaf#egg=sec_edgar_downloader&subdirectory=.lib/sec-edgar-downloader
--e git+https://github.com/IMTorgOpenDataTools/sec-workflows.git@85bb4ce92783c0d9cb92681f1f7c6979f6cb5eaf#egg=sec_edgar_extractor&subdirectory=.lib/sec-edgar-extractor
+-e git+https://github.com/IMTorgOpenDataTools/sec-workflows.git@fdf45e7cd4797dc9a02463137bde02573f165210#egg=sec_edgar_downloader&subdirectory=.lib/sec-edgar-downloader
+-e git+https://github.com/IMTorgOpenDataTools/sec-workflows.git@fdf45e7cd4797dc9a02463137bde02573f165210#egg=sec_edgar_extractor&subdirectory=.lib/sec-edgar-extractor
 six==1.16.0
 soupsieve==2.3.1
 SQLAlchemy==1.4.32

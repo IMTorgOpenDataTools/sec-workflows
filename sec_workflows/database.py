@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Module Docstring
+Database class for connecting and managing sqlite3 db.
 """
 __author__ = "Jason Beach"
 __version__ = "0.1.0"

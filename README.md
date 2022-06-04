@@ -65,6 +65,13 @@ To be used in any venv,
 
 ## TODO
 
+* lsf (help)
+  - tidy not being found
+  - how to write stdout,stderr to folder?
+  - job description email notification not sent
+* workflow
+  - create test `main.py run` updates
+  - how does report timespan increase? (should be q2 now)
 * confidence level: 
   - create for extractor
   - update worflow

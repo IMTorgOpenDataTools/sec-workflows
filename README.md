@@ -66,6 +66,7 @@ To be used in any venv,
 ## TODO
 
 * lsf (help)
+  - only send email on change
   - tidy not being found
   - how to write stdout,stderr to folder?
   - job description email notification not sent

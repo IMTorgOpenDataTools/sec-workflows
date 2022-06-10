@@ -7,18 +7,11 @@ __version__ = "0.1.0"
 __license__ = "MIT"
 
 #third-party
-from tracemalloc import start
-import pandas as pd
-import sqlalchemy as sql                     
-from sqlalchemy import Table, Column, Integer, String, MetaData
-import sqlalchemy_utils as sql_util 
 
 #built-in
-import os
 from pathlib import Path
 import time
 from datetime import date, datetime, timedelta
-import requests
 import argparse
 
 #my libs
@@ -39,6 +32,7 @@ from _constants import (
     LIST_ALL_TABLES,
     MINUTES_BETWEEN_CHECKS,
     DIR_REPORTS,
+    DIR_SEC_DOWNLOADS,
     logger
 )
 
@@ -47,7 +41,8 @@ from _constants import (
 db = Database(db_file = FILE_DB,
                 tables_list = LIST_ALL_TABLES,
                 meta = meta,
-                logger = logger
+                logger = logger,
+                path_download = DIR_SEC_DOWNLOADS
                 )
 report = Report(db = db, 
                 output_path=DIR_REPORTS

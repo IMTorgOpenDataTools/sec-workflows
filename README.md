@@ -75,7 +75,7 @@ To be used in any venv,
   - mock api for tests
   - create test `main.py run` updates
   - how does report timespan increase? does it append new, or all-or-nothing?
-  - add logger to extractor
+  - add logger to downloader, extractor
 * confidence level: 
   - create for extractor
   - update worflow

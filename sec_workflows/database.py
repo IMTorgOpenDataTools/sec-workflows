@@ -11,7 +11,6 @@ from flask import after_this_request
 import pandas as pd
 import numpy as np
 import sqlalchemy as sql                     #create_engine
-from sqlalchemy import Table, Column, Integer, String, MetaData
 import sqlalchemy_utils as sql_util         #database_exists, create_database
 
 from sec_edgar_downloader import Downloader
@@ -22,10 +21,7 @@ from sec_edgar_extractor.instance_doc import Instance_Doc
 #built-in
 from asyncio.log import logger
 from pathlib import Path
-import logging
-import time
 from datetime import date, timedelta
-import requests
 
 #my libs
 import sys
@@ -47,20 +43,34 @@ from _constants import (
 class Database:
     """Database class."""
 
-    def __init__(self, db_file, tables_list, meta, logger):
+    def __init__(self, db_file, tables_list, meta, logger, path_download):
         self.db_file = Path(db_file)
         self.db_path = f'sqlite:///{db_file}' 
         self.table_name = tables_list
         self.meta = meta
         self.engine = None
         self.logger = logger
-        #TODO:add Downloader, Extractor, Inst_Doc
+        self.path_download = Path(path_download)
 
+        #db file
         check_file = self.check_db_file()
         if check_file:
             pass
         else:
             self.logger.warning('Fail db creation.')
+
+        #downloads
+        if self.path_download.is_dir():
+            pass
+        else:
+            try:
+                self.path_download.mkdir(parents=True, exist_ok=True)
+            except:
+                self.logger.warn('Failed to make downloads path')
+
+        self.downloader = Downloader(self.path_download)
+        self.extractor = Extractor(save_intermediate_files=True)
+        self.instance_doc = Instance_Doc()
 
 
     def check_db_file(self):
@@ -127,7 +137,7 @@ class Database:
         """Get certified quarterly earnings (10-K/-Q) for list of firms, after a date.
 
         Takes the following steps:
-        * discover certified quarterly earnings (10-K/-Q) filings for list of firms (after a date)
+        * discover certified quarterly earnings (10-K/-Q) filings for a list of firms (after a date)
         * determines if they were previously downloaded, continue if not
         * download the instance document
         * extract the xbrl information
@@ -136,7 +146,6 @@ class Database:
         # configure
         FILE_TYPES = ['10-K', '10-Q']
         AFTER = after                           #"2022-01-01"
-        path_download = "./archive/downloads"
 
         # check if table is initialized
         stmt = "SELECT * FROM " + self.table_name[0]["name"] + " WHERE form like '10-%'"
@@ -144,17 +153,13 @@ class Database:
         #if df_10q.shape[0] > 0: return True
         
         # check if new filing records exist
-        dl = Downloader(path_download)
-        ex = Extractor(save_intermediate_files=True)
-        idoc = Instance_Doc()
-
         ciks = [str(firm._cik) for firm in firms]
         tickers = [(str(firm._cik), str(firm._ticker)) for firm in firms]
         url_new = []
         for firm in firms:
             for filing in FILE_TYPES:
                 TICKER = firm.get_info()['ticker']
-                url = dl.get_metadata(filing,
+                url = self.downloader.get_metadata(filing,
                                     TICKER, 
                                     after=AFTER
                                     )
@@ -162,7 +167,7 @@ class Database:
         #if not len(url_new) > 0: return True
 
         # check if new filings are in database, get them if not
-        df_fs = dl.filing_storage.get_dataframe(mode='document')
+        df_fs = self.downloader.filing_storage.get_dataframe(mode='document')
         sel1 = df_fs[(df_fs['short_cik'].isin(ciks)) 
                 & (df_fs['file_type'].isin(FILE_TYPES))
                 & (df_fs['Type'] == 'XML')
@@ -170,8 +175,8 @@ class Database:
                 & (pd.to_datetime(df_fs['file_date']) > AFTER)
                 ]
         lst_of_idx = sel1.index.tolist()
-        staged = dl.filing_storage.get_document_in_record( lst_of_idx )
-        updated_docs = dl.get_documents_from_url_list(staged)
+        staged = self.downloader.filing_storage.get_document_in_record( lst_of_idx )
+        updated_docs = self.downloader.get_documents_from_url_list(staged)
 
         accns = [doc[0].split('|')[1] for doc in updated_docs['new']]
         df_new_filings = df_10q[df_10q['accn'].isin(accns)]
@@ -189,14 +194,14 @@ class Database:
                 ticker = [item[1] for item in tickers if item[0] == cik][0]
                 accn = doc.FS_Location.parent.name
                 key = f'{cik}|{accn}'
-                filing = dl.filing_storage.get_record(key)
-                accts = ex.config[ ticker ].accounts.items()
+                filing = self.downloader.filing_storage.get_record(key)
+                accts = self.extractor.config[ ticker ].accounts.items()
 
                 #extract xbrl values
                 start = pd.to_datetime( filing.file_date )
                 with open(doc.FS_Location, 'r') as f:
                     file_htm_xml = f.read()
-                df_doc, df = idoc.create_xbrl_dataframe( file_htm_xml )
+                df_doc, df = self.instance_doc.create_xbrl_dataframe( file_htm_xml )
                 fy = df_doc.value[df_doc['name']=='DocumentFiscalYearFocus'].values[0]
                 fp = df_doc.value[df_doc['name']=='DocumentFiscalPeriodFocus'].values[0]
                 end = df_doc.value[df_doc['name']=='DocumentPeriodEndDate'].values[0]
@@ -269,7 +274,6 @@ class Database:
                 return False
 
         AFTER = after           #"2022-01-01"
-        path_download = "./archive/downloads"
 
         # check if table initialized
         stmt = "SELECT * FROM " + self.table_name[0]["name"] + " WHERE form like '8-%'"
@@ -278,13 +282,13 @@ class Database:
 
         # download
         ciks = [str(firm._cik) for firm in firms]
-        dl = Downloader(path_download)
         for firm in firms:
             TICKER = firm.get_info()['ticker']
-            urls = dl.get_metadata("8-K",
+            urls = self.downloader.get_metadata("8-K",
                                 TICKER, 
                                 after = AFTER)   
-        df = dl.filing_storage.get_dataframe(mode='document')
+
+        df = self.downloader.filing_storage.get_dataframe(mode='document')
         sel1 = df[(df['short_cik'].isin(ciks)) 
                     & (df['file_type'] == '8-K')
                     & (pd.to_datetime(df['file_date']) > AFTER) 
@@ -292,8 +296,8 @@ class Database:
         mask = sel1.apply(check, axis=1)
         sel2 = sel1[mask]
         lst_of_idx = sel2.index.tolist()
-        staged = dl.filing_storage.get_document_in_record( lst_of_idx )
-        updated_docs = dl.get_documents_from_url_list(staged)
+        staged = self.downloader.filing_storage.get_document_in_record( lst_of_idx )
+        updated_docs = self.downloader.get_documents_from_url_list(staged)
 
         accns = [doc[0].split('|')[1] for doc in updated_docs['new']]
         df_new_filings = df_8k[df_8k['accn'].isin(accns)]
@@ -302,7 +306,6 @@ class Database:
         else:
             # extract
             selected_docs = list(updated_docs['new']) + list(updated_docs['previous'])
-            extractor = Extractor(save_intermediate_files=True)
             recs = []
             for key, doc in selected_docs:
                 if not doc.FS_Location:
@@ -313,20 +316,20 @@ class Database:
                 doc_meta = sel2[sel2.Document == doc.Document].to_dict('record')[0]
 
                 # process with extractor
-                items = extractor.execute_extract_process(doc=doc, ticker=ticker)
+                items = self.extractor.execute_extract_process(doc=doc, ticker=ticker)
                 items_key = list(items.keys())[0]
                 for acct, val in items[items_key].items():
                     if type(val) == str: continue
-                    if doc.Type != extractor.config[ticker].accounts[acct].exhibits: continue
-                    scale = extractor.config[ticker].accounts[acct].scale
+                    if doc.Type != self.extractor.config[ticker].accounts[acct].exhibits: continue
+                    scale = self.extractor.config[ticker].accounts[acct].scale
                     rec = RecordMetadata(
                                     cik = str(doc_meta['short_cik']),
                                     accn = str(doc_meta['accession_number']),
                                     form = f"{doc_meta['file_type']}/{doc.Type}",
                                     account = acct,
                                     value = scale_value(val, scale),
-                                    account_title = extractor.config[ticker].accounts[acct].table_account,
-                                    xbrl_tag = extractor.config[ticker].accounts[acct].xbrl,
+                                    account_title = self.extractor.config[ticker].accounts[acct].table_account,
+                                    xbrl_tag = self.extractor.config[ticker].accounts[acct].xbrl,
                                     fy = np.nan,
                                     fp = np.nan,
                                     end = np.nan,

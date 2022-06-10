@@ -12,9 +12,6 @@ import pdfkit
 
 import pandas as pd
 import numpy as np
-import sqlalchemy as sql                     #create_engine
-from sqlalchemy import Table, Column, Integer, String, MetaData
-import sqlalchemy_utils as sql_util         #database_exists, create_database
 
 from plotnine import *
 from mizani.breaks import date_breaks
@@ -23,10 +20,7 @@ from mizani.formatters import date_format
 #built-in
 from asyncio.log import logger
 from pathlib import Path
-import logging
-import time
 from datetime import datetime, date, timedelta
-import requests
 from collections import namedtuple
 import ast
 from enum import unique

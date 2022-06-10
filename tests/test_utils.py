@@ -6,17 +6,17 @@ __author__ = "Jason Beach"
 __version__ = "0.1.0"
 __license__ = "MIT"
 
+#third-party
+from sec_edgar_downloader import UrlComponent as uc
 
+#builtin
 import pytest
-
 import sys
 from pathlib import Path
-from datetime import date, datetime, timedelta
 import requests
 
-from sec_workflows.utils import Logger
+#lib
 from sec_workflows.database import Database
-
 from sec_workflows.utils import (
     send_notification, 
     api_request, 
@@ -26,17 +26,17 @@ from sec_workflows.utils import (
     create_qtr,
     poll_sec_edgar
 )
-
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     meta,
-    LIST_ALL_FIRMS,
-    LIST_ALL_TABLES
+    LIST_ALL_TABLES,
+    Logger
 )
 
 
 
 def test_send_notification():
+    #this will fail if `mailx` is not available
     checks = send_notification()
     assert checks != []
 
@@ -95,7 +95,8 @@ def resource_db():
     db = Database(db_file = db_file,
                     tables_list = LIST_ALL_TABLES,
                     meta = meta,
-                    logger = logger
+                    logger = logger,
+                    path_download = './tests/tmp/downloads'
                     )
     # tests
     yield db
@@ -107,10 +108,19 @@ def resource_db():
     log_file.parent.rmdir()
 
 
-def test_poll_sec_edgar(resource_db):
-    days = timedelta(days = 3)
-    start_date = datetime.now().date() - days
-    after_date = start_date.strftime("%Y-%m-%d")
-
-    changed_firms = poll_sec_edgar(resource_db, LIST_ALL_FIRMS, after_date)
-    assert True == True
+def test_poll_sec_edgar(mocker, resource_db):
+    output_data = {
+                'accessionNumber': ['0001193125-22-150841'],
+                'filingDate': ['2022-05-16'],
+                'form': ['8-K'],
+                'size': [235273],
+                'primaryDocument': ['d329362d8k.htm']
+    }
+    mock_request = mocker.patch('sec_workflows.utils.api_request', 
+                return_value = output_data
+                ) 
+    firms = [ uc.Firm(ticker = "USB") ]
+    after_date = '2022-05-01'
+    changed_firms = poll_sec_edgar(resource_db, firms, after_date)
+    mock_request.call_args.__str__() == "call(session=<requests.sessions.Session object at 0x7f065f9cbf70>, type='firm_details', cik=36104, acct=None)"
+    assert changed_firms.__repr__() == "{'8k': {US BANCORP DE}, '10kq': set()}"

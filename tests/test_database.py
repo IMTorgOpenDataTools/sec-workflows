@@ -13,16 +13,15 @@ from sec_edgar_downloader import UrlComponent as uc
 import pytest
 import sys
 from pathlib import Path
-from datetime import date, datetime, timedelta
 
 #lib
-from sec_workflows.utils import Logger
 from sec_workflows.database import Database
-
+from sec_workflows.utils import delete_folder
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     LIST_ALL_TABLES,
-    meta
+    meta,
+    Logger
 )
 
 
@@ -39,12 +38,14 @@ def resource_db():
     db = Database(db_file = db_file,
                     tables_list = LIST_ALL_TABLES,
                     meta = meta,
-                    logger = logger
+                    logger = logger,
+                    path_download = './tests/tmp/downloads'
                     )
     # tests
     yield db
 
     # tear-down
+    delete_folder( db.path_download )
     del db
     log_file.unlink() if log_file.is_file() else None
     db_file.unlink() if db_file.is_file() else None
@@ -70,10 +71,7 @@ class TestResourceDb:
 
     def test_get_quarterly_statements(self, resource_db):
         firms = [ uc.Firm(ticker = "USB") ]
-
-        days = timedelta(days = 3)
-        start_date = datetime.now().date() - days
-        after_date = start_date.strftime("%Y-%m-%d")
+        after_date = '2022-05-01'
 
         check_schema = resource_db.check_db_schema()
         execute = resource_db.get_quarterly_statements(firms, after_date)
@@ -81,10 +79,7 @@ class TestResourceDb:
 
     def test_get_earnings_releases(self, resource_db):
         firms = [ uc.Firm(ticker = "USB") ]
-
-        days = timedelta(days = 3)
-        start_date = datetime.now().date() - days
-        after_date = start_date.strftime("%Y-%m-%d")
+        after_date = '2022-05-01'
 
         check_schema = resource_db.check_db_schema()
         execute = resource_db.get_earnings_releases(firms, after_date)

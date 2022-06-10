@@ -7,27 +7,16 @@ __version__ = "0.1.0"
 __license__ = "MIT"
 
 #third-party
-from sec_edgar_downloader import Downloader
-from sec_edgar_downloader import UrlComponent as uc
-from sec_edgar_extractor.extract import Extractor
-from sec_edgar_extractor.instance_doc import Instance_Doc
-
 import pandas as pd
-import numpy as np
-import sqlalchemy as sql
-from plotnine import *
-from mizani.breaks import date_breaks
-from mizani.formatters import date_format
 
 #builtin
-
 from collections import namedtuple
 import subprocess
 from subprocess import PIPE, STDOUT
 from enum import unique
 
 from pathlib import Path
-from datetime import datetime, date, timedelta
+#from datetime import datetime, date, timedelta
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -37,7 +26,6 @@ import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     FILE_EMAILS,
-    DIR_SEC_DOWNLOADS,
     MAX_RETRIES,
     DEFAULT_TIMEOUT,
     logger
@@ -216,7 +204,6 @@ def poll_sec_edgar(db, firms, after_date):
     Only checks if 8k form, does not check if it is an earnings call.
     
     """
-
     after = pd.Timestamp(after_date).__str__()    #'2022-03-01 00:00:00'
 
     client = requests.Session()
@@ -246,6 +233,16 @@ def poll_sec_edgar(db, firms, after_date):
                     if row['form'] in ['10-K', '10-Q']:
                         form_updates['10kq'].add(firm)
     return form_updates
+
+
+
+def delete_folder(pth) :
+    for sub in pth.iterdir() :
+        if sub.is_dir() :
+            delete_folder(sub)
+        else :
+            sub.unlink()
+    pth.rmdir()
 
 
 

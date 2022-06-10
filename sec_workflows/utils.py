@@ -259,7 +259,10 @@ def create_qtr(row):
 
 
 def poll_sec_edgar(db, firms, after_date):
-    """Check for changes in SEC EDGAR DB, and return corresponding firms"""
+    """Check for changes in SEC EDGAR DB, and return corresponding firms.
+    Only checks if 8k form, does not check if it is an earnings call.
+    
+    """
 
     after = pd.Timestamp(after_date).__str__()    #'2022-03-01 00:00:00'
 
@@ -282,7 +285,7 @@ def poll_sec_edgar(db, firms, after_date):
 
             df = pd.DataFrame.from_dict(recs)
             df['filingDate_t'] = pd.to_datetime(df['filingDate'])
-            df_tmp1 = df[df['filingDate_t'] > after]                #ensure `after` is changed for testing
+            df_tmp1 = df[df['filingDate_t'] > after]                
             if df_tmp1.shape[0] > 0:
                 for row in df_tmp1.to_dict('records'):
                     if row['form'] in ['8-K']:

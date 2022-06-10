@@ -6,9 +6,16 @@ __author__ = "Jason Beach"
 __version__ = "0.1.0"
 __license__ = "MIT"
 
+#third-party
+from sec_edgar_downloader import UrlComponent as uc
+
+#builtin
 import pytest
 import sys
 from pathlib import Path
+from datetime import date, datetime, timedelta
+
+#lib
 from sec_workflows.utils import Logger
 from sec_workflows.database import Database
 
@@ -60,3 +67,25 @@ class TestResourceDb:
     def test_check_db_schema(self, resource_db):
         check_schema = resource_db.check_db_schema()
         assert check_schema == True
+
+    def test_get_quarterly_statements(self, resource_db):
+        firms = [ uc.Firm(ticker = "USB") ]
+
+        days = timedelta(days = 3)
+        start_date = datetime.now().date() - days
+        after_date = start_date.strftime("%Y-%m-%d")
+
+        check_schema = resource_db.check_db_schema()
+        execute = resource_db.get_quarterly_statements(firms, after_date)
+        assert execute == True
+
+    def test_get_earnings_releases(self, resource_db):
+        firms = [ uc.Firm(ticker = "USB") ]
+
+        days = timedelta(days = 3)
+        start_date = datetime.now().date() - days
+        after_date = start_date.strftime("%Y-%m-%d")
+
+        check_schema = resource_db.check_db_schema()
+        execute = resource_db.get_earnings_releases(firms, after_date)
+        assert execute == True

@@ -7,6 +7,7 @@ __version__ = "0.1.0"
 __license__ = "MIT"
 
 #third-party
+from tracemalloc import start
 import pandas as pd
 import sqlalchemy as sql                     
 from sqlalchemy import Table, Column, Integer, String, MetaData
@@ -54,6 +55,67 @@ report = Report(db = db,
                 )
 
 
+#processes
+def initialize_process():
+    years = timedelta(weeks = 52)
+    start_date = datetime.now().date() - years
+    after_date = start_date.strftime("%Y-%m-%d") 
+
+    api = db.get_quarterly_statements(LIST_ALL_FIRMS, after_date)
+    scrape = db.get_earnings_releases(LIST_ALL_FIRMS, after_date)
+    format_10q = db.format_raw_quarterly_records()
+    format_8k = db.format_raw_earnings_records()
+
+    if all([api, scrape, format_10q, format_8k]): 
+        report.create_report(type='long')
+        logger.info(f'Database initialization complete')
+    else:
+        logger.info(f'No databae update necessary')
+
+
+def run_process():
+    loop = True                                                                 #setup based on desired loop style
+    while loop:
+        days = timedelta(days = 3)
+        start_date = datetime.now().date() - days
+        after_date = start_date.strftime("%Y-%m-%d")
+        start_records = db.query_database('records').shape[0]
+
+        changed_firms = poll_sec_edgar(db, LIST_ALL_FIRMS, after_date)
+        firms = []
+        values = list( changed_firms.values() )
+        [firms.extend(list(item)) for item in values]
+        if len(firms) > 0:
+            print('sec edgar changed')
+            if changed_firms['10kq']:
+                firm_list = list(changed_firms['10kq'])
+                api = db.get_quarterly_statements(firm_list, after_date)
+                format_10q = db.format_raw_quarterly_records()
+                print('database updated 10kq')
+            if changed_firms['8k']:
+                firm_list = list(changed_firms['8k'])
+                scrape = db.get_earnings_releases(firm_list, after_date)
+                format_8k = db.format_raw_earnings_records()
+                print('database updated 8k')
+
+            end_records = db.query_database('records').shape[0]
+            if end_records > start_records:
+                report.create_report(type='accounting_policy')
+                send_notification()
+        else:
+            print('no change to server')
+        secs = MINUTES_BETWEEN_CHECKS * 60
+        time.sleep(secs)
+        loop = False
+
+
+def reports_process():
+    report.create_report(type='long')
+    report.create_report(type='accounting_policy')
+    #create_report(type='trend', db=db, output_path=DIR_REPORTS)
+    report.create_report(type='validate')
+
+
 
 
 
@@ -72,57 +134,12 @@ def main(args):
 
     #process
     match args.mode[0]:
-
         case 'init':
-            years = timedelta(weeks = 52)
-            start_date = datetime.now().date() - years
-            after_date = start_date.strftime("%Y-%m-%d") 
-
-            api = db.get_quarterly_statements(LIST_ALL_FIRMS, after_date)
-            scrape = db.get_earnings_releases(LIST_ALL_FIRMS, after_date)
-            format_10q = db.format_raw_quarterly_records()
-            format_8k = db.format_raw_earnings_records()
-
-            if all([api, scrape, format_10q, format_8k]): 
-                report.create_report(type='long')
-                logger.info(f'Database initialization complete')
-            else:
-                logger.info(f'No databae update necessary')
-
+            initialize_process()
         case 'run':
-            loop = True                                                                 #setup based on desired loop style
-            while loop:
-                days = timedelta(days = 3)
-                start_date = datetime.now().date() - days
-                after_date = start_date.strftime("%Y-%m-%d")
-
-                changed_firms = poll_sec_edgar(db, LIST_ALL_FIRMS, after_date)
-                if len(list(changed_firms.values())) > 0:
-                    print('sec edgar changed')
-                    if changed_firms['10kq']:
-                        firm_list = list(changed_firms['10kq'])
-                        api = db.get_quarterly_statements(firm_list, after_date)
-                        format_10q = db.format_raw_quarterly_records()
-                        print('database updated 10kq')
-                    if changed_firms['8k']:
-                        firm_list = list(changed_firms['8k'])
-                        scrape = db.get_earnings_releases(firm_list, after_date)
-                        format_8k = db.format_raw_earnings_records()
-                        print('database updated 8k')
-                    report.create_report(type='accounting_policy')
-                    send_notification()
-                else:
-                    print('no change to server')
-                secs = MINUTES_BETWEEN_CHECKS * 60
-                time.sleep(secs)
-                loop = False
-
+            run_process()
         case 'report':
-            report.create_report(type='long')
-            report.create_report(type='accounting_policy')
-            #create_report(type='trend', db=db, output_path=DIR_REPORTS)
-            report.create_report(type='validate')
-
+            reports_process()
         case 'RESET_FILES':
             reset_files()
 

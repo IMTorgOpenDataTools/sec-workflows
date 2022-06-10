@@ -65,14 +65,16 @@ To be used in any venv,
 
 ## TODO
 
-* lsf (help)
-  - only send email on change
+* deployment / lsf, grid
   - tidy not being found
   - how to write stdout,stderr to folder?
   - job description email notification not sent
 * workflow
+  - keep asyncio.log but change print() to log()
+  - add asyncio.log to extractor
+  - only send email on change
   - create test `main.py run` updates
-  - how does report timespan increase? (should be q2 now)
+  - how does report timespan increase? does it append new, or all-or-nothing?
 * confidence level: 
   - create for extractor
   - update worflow

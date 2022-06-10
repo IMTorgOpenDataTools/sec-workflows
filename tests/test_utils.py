@@ -8,7 +8,14 @@ __license__ = "MIT"
 
 
 import pytest
+
+import sys
+from pathlib import Path
+from datetime import date, datetime, timedelta
 import requests
+
+from sec_workflows.utils import Logger
+from sec_workflows.database import Database
 
 from sec_workflows.utils import (
     send_notification, 
@@ -16,7 +23,15 @@ from sec_workflows.utils import (
     remove_list_dups,
     make_long_cik,
     scale_value,
-    create_qtr
+    create_qtr,
+    poll_sec_edgar
+)
+
+sys.path.append(Path('config').absolute().as_posix() )
+from _constants import (
+    meta,
+    LIST_ALL_FIRMS,
+    LIST_ALL_TABLES
 )
 
 
@@ -66,3 +81,36 @@ def test_create_qtr():
     }
     rtn = create_qtr(row)
     assert rtn == '2022-Q1'
+
+
+
+
+
+@pytest.fixture()
+def resource_db():
+    # setup
+    log_file = Path('./tests/tmp/process.log')
+    db_file = Path('./tests/tmp/test.db')
+    logger = Logger(log_file).create_logger()
+    db = Database(db_file = db_file,
+                    tables_list = LIST_ALL_TABLES,
+                    meta = meta,
+                    logger = logger
+                    )
+    # tests
+    yield db
+
+    # tear-down
+    del db
+    log_file.unlink() if log_file.is_file() else None
+    db_file.unlink() if db_file.is_file() else None
+    log_file.parent.rmdir()
+
+
+def test_poll_sec_edgar(resource_db):
+    days = timedelta(days = 3)
+    start_date = datetime.now().date() - days
+    after_date = start_date.strftime("%Y-%m-%d")
+
+    changed_firms = poll_sec_edgar(resource_db, LIST_ALL_FIRMS, after_date)
+    assert True == True

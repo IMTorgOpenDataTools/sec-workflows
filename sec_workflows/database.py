@@ -54,6 +54,7 @@ class Database:
         self.meta = meta
         self.engine = None
         self.logger = logger
+        #TODO:add Downloader, Extractor, Inst_Doc
 
         check_file = self.check_db_file()
         if check_file:
@@ -123,49 +124,67 @@ class Database:
 
 
     def get_quarterly_statements(self, firms, after):
-        """Initialize the database with certified quarterly earnings (10-K/-Q).
+        """Get certified quarterly earnings (10-K/-Q) for list of firms, after a date.
+
+        Takes the following steps:
+        * discover certified quarterly earnings (10-K/-Q) filings for list of firms (after a date)
+        * determines if they were previously downloaded, continue if not
+        * download the instance document
+        * extract the xbrl information
+        * load into database table `records`
         """
         # configure
         FILE_TYPES = ['10-K', '10-Q']
         AFTER = after                           #"2022-01-01"
         path_download = "./archive/downloads"
 
-        # check if data exists
+        # check if table is initialized
         stmt = "SELECT * FROM " + self.table_name[0]["name"] + " WHERE form like '10-%'"
         df_10q = pd.read_sql(stmt, self.engine)
-        if df_10q.shape[0] > 0:
-            pass
+        #if df_10q.shape[0] > 0: return True
+        
+        # check if new filing records exist
+        dl = Downloader(path_download)
+        ex = Extractor(save_intermediate_files=True)
+        idoc = Instance_Doc()
+
+        ciks = [str(firm._cik) for firm in firms]
+        tickers = [(str(firm._cik), str(firm._ticker)) for firm in firms]
+        url_new = []
+        for firm in firms:
+            for filing in FILE_TYPES:
+                TICKER = firm.get_info()['ticker']
+                url = dl.get_metadata(filing,
+                                    TICKER, 
+                                    after=AFTER
+                                    )
+                url_new.extend(url['new'])
+        #if not len(url_new) > 0: return True
+
+        # check if new filings are in database, get them if not
+        df_fs = dl.filing_storage.get_dataframe(mode='document')
+        sel1 = df_fs[(df_fs['short_cik'].isin(ciks)) 
+                & (df_fs['file_type'].isin(FILE_TYPES))
+                & (df_fs['Type'] == 'XML')
+                & (df_fs['Document'].str.contains('_htm.xml', case=True))
+                & (pd.to_datetime(df_fs['file_date']) > AFTER)
+                ]
+        lst_of_idx = sel1.index.tolist()
+        staged = dl.filing_storage.get_document_in_record( lst_of_idx )
+        updated_docs = dl.get_documents_from_url_list(staged)
+
+        accns = [doc[0].split('|')[1] for doc in updated_docs['new']]
+        df_new_filings = df_10q[df_10q['accn'].isin(accns)]
+        if set( df_new_filings['accn'].to_list() ) == set( accns ):
+            return True
         else:
-            dl = Downloader(path_download)
-            ex = Extractor(save_intermediate_files=True)
-            idoc = Instance_Doc()
 
-            # download doc urls
-            ciks = [str(firm._cik) for firm in firms]
-            tickers = [(str(firm._cik), str(firm._ticker)) for firm in firms]
-            for firm in firms:
-                for filing in FILE_TYPES:
-                    TICKER = firm.get_info()['ticker']
-                    urls = dl.get_metadata(filing,
-                                        TICKER, 
-                                        after=AFTER
-                                        )   
-            df_fs = dl.filing_storage.get_dataframe(mode='document')
-            sel1 = df_fs[(df_fs['short_cik'].isin(ciks)) 
-                    & (df_fs['file_type'].isin(FILE_TYPES))
-                    & (df_fs['Type'] == 'XML')
-                    & (df_fs['Document'].str.contains('_htm.xml', case=True))
-                    ]
-            lst_of_idx = sel1.index.tolist()
-            staged = dl.filing_storage.get_document_in_record( lst_of_idx )
-            updated_docs = dl.get_documents_from_url_list(staged)
-
-            # prepare and load data items
+            # prepare and load the new data items
             selected_docs = list(updated_docs['new']) + list(updated_docs['previous'])
             recs = []
             for key, doc in selected_docs:
-                if not doc.FS_Location:
-                    continue
+                #prepare
+                if not doc.FS_Location: continue
                 cik = doc.FS_Location.parent.parent.name
                 ticker = [item[1] for item in tickers if item[0] == cik][0]
                 accn = doc.FS_Location.parent.name
@@ -173,6 +192,7 @@ class Database:
                 filing = dl.filing_storage.get_record(key)
                 accts = ex.config[ ticker ].accounts.items()
 
+                #extract xbrl values
                 start = pd.to_datetime( filing.file_date )
                 with open(doc.FS_Location, 'r') as f:
                     file_htm_xml = f.read()
@@ -213,7 +233,6 @@ class Database:
                         print(e)
                         continue
                     
-
             # save to db
             df = pd.DataFrame(recs, columns=RecordMetadata._fields)
             try:
@@ -251,32 +270,38 @@ class Database:
 
         AFTER = after           #"2022-01-01"
         path_download = "./archive/downloads"
-        # check if data exists
+
+        # check if table initialized
         stmt = "SELECT * FROM " + self.table_name[0]["name"] + " WHERE form like '8-%'"
         df_8k = pd.read_sql(stmt, self.engine)
-        if df_8k.shape[0] > 0:
-            pass
-        else:
-            # download
-            ciks = [str(firm._cik) for firm in firms]
-            dl = Downloader(path_download)
-            for firm in firms:
-                TICKER = firm.get_info()['ticker']
-                urls = dl.get_metadata("8-K",
-                                    TICKER, 
-                                    after = AFTER)   
-            df = dl.filing_storage.get_dataframe(mode='document')
-            sel1 = df[(df['short_cik'].isin(ciks)) 
-                        & (df['file_type'] == '8-K') 
-                        ]
-            mask = sel1.apply(check, axis=1)
-            sel2 = sel1[mask]
-            lst_of_idx = sel2.index.tolist()
-            staged = dl.filing_storage.get_document_in_record( lst_of_idx )
-            updated_docs = dl.get_documents_from_url_list(staged)
-            selected_docs = list(updated_docs['new']) + list(updated_docs['previous'])
+        #if df_8k.shape[0] > 0: pass
 
+        # download
+        ciks = [str(firm._cik) for firm in firms]
+        dl = Downloader(path_download)
+        for firm in firms:
+            TICKER = firm.get_info()['ticker']
+            urls = dl.get_metadata("8-K",
+                                TICKER, 
+                                after = AFTER)   
+        df = dl.filing_storage.get_dataframe(mode='document')
+        sel1 = df[(df['short_cik'].isin(ciks)) 
+                    & (df['file_type'] == '8-K')
+                    & (pd.to_datetime(df['file_date']) > AFTER) 
+                    ]
+        mask = sel1.apply(check, axis=1)
+        sel2 = sel1[mask]
+        lst_of_idx = sel2.index.tolist()
+        staged = dl.filing_storage.get_document_in_record( lst_of_idx )
+        updated_docs = dl.get_documents_from_url_list(staged)
+
+        accns = [doc[0].split('|')[1] for doc in updated_docs['new']]
+        df_new_filings = df_8k[df_8k['accn'].isin(accns)]
+        if set( df_new_filings['accn'].to_list() ) == set( accns ):
+            return True
+        else:
             # extract
+            selected_docs = list(updated_docs['new']) + list(updated_docs['previous'])
             extractor = Extractor(save_intermediate_files=True)
             recs = []
             for key, doc in selected_docs:

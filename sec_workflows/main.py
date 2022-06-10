@@ -25,7 +25,6 @@ import argparse
 from database import Database
 from report import Report
 from utils import (
-    Logger,
     send_notification,
     poll_sec_edgar,
     reset_files
@@ -40,11 +39,11 @@ from _constants import (
     LIST_ALL_TABLES,
     MINUTES_BETWEEN_CHECKS,
     DIR_REPORTS,
+    logger
 )
 
 
 #configure
-logger = Logger(FILE_LOG).create_logger()
 db = Database(db_file = FILE_DB,
                 tables_list = LIST_ALL_TABLES,
                 meta = meta,
@@ -86,24 +85,24 @@ def run_process():
         values = list( changed_firms.values() )
         [firms.extend(list(item)) for item in values]
         if len(firms) > 0:
-            print('sec edgar changed')
+            logger.info('sec edgar changed')
             if changed_firms['10kq']:
                 firm_list = list(changed_firms['10kq'])
                 api = db.get_quarterly_statements(firm_list, after_date)
                 format_10q = db.format_raw_quarterly_records()
-                print('database updated 10kq')
+                logger.info('database updated 10kq')
             if changed_firms['8k']:
                 firm_list = list(changed_firms['8k'])
                 scrape = db.get_earnings_releases(firm_list, after_date)
                 format_8k = db.format_raw_earnings_records()
-                print('database updated 8k')
+                logger.info('database updated 8k')
 
             end_records = db.query_database('records').shape[0]
             if end_records > start_records:
                 report.create_report(type='accounting_policy')
                 send_notification()
         else:
-            print('no change to server')
+            logger.info('no change to server')
         secs = MINUTES_BETWEEN_CHECKS * 60
         time.sleep(secs)
         loop = False

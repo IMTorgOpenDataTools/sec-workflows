@@ -7,14 +7,17 @@ __version__ = "0.1.0"
 __license__ = "MIT"
 
 #third-party
-from sec_edgar_extractor.extract import Extractor
-from sec_edgar_downloader import UrlComponent as uc
-
-#builtin
-from collections import namedtuple
 import pandas as pd
 from sqlalchemy import Table, Column, Integer, String, MetaData
 
+#builtin
+import logging
+from pathlib import Path
+from collections import namedtuple
+
+#my libs
+from sec_edgar_extractor.extract import Extractor
+from sec_edgar_downloader import UrlComponent as uc
 
 
 
@@ -72,6 +75,30 @@ FirmRecord = namedtuple(
         'accounts'
     ]
 )
+
+
+
+# initialize logging
+class Logger:
+
+    def __init__(self, log_file):
+        self.log_file = Path(log_file)
+
+    def create_logger(self):
+        """Create logger and associated file (if necessary)."""
+        if not self.log_file.parent.is_dir():
+            self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        if not self.log_file.is_file():
+            open(self.log_file, 'x').close()
+
+        logging.basicConfig(filename=self.log_file, 
+                            encoding='utf-8', 
+                            level=logging.INFO, 
+                            format='%(asctime)s %(message)s')
+        logger = logging.getLogger(__name__)
+        return logger
+
+logger = Logger(FILE_LOG).create_logger()
 
 
 

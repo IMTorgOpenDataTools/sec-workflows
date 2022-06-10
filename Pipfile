@@ -58,6 +58,7 @@ sec-edgar-downloader = {editable = true, path = "./.lib/sec-edgar-downloader"}
 plotnine = "*"
 xlsxwriter = "*"
 sec-edgar-extractor = {editable = true, path = "./.lib/sec-edgar-extractor"}
+pytest-mock = "*"
 
 [dev-packages]
 

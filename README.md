@@ -70,11 +70,12 @@ To be used in any venv,
   - how to write stdout,stderr to folder?
   - job description email notification not sent
 * workflow
-  - keep asyncio.log but change print() to log()
-  - add asyncio.log to extractor
-  - only send email on change
+  - ~~add logger and change print() to log()~~
+  - ~~only send email on change~~
+  - mock api for tests
   - create test `main.py run` updates
   - how does report timespan increase? does it append new, or all-or-nothing?
+  - add logger to extractor
 * confidence level: 
   - create for extractor
   - update worflow

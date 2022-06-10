@@ -213,7 +213,7 @@ class Database:
                         if subset.shape[0] > 0:
                             item = subset.sort_values(by='start', ascending=False).to_dict('records')[0]        #TODO: progressive subsetting if dimesion is not empty
                         else:
-                            print(f'XBRL Tag not found for: {ticker}')
+                            logger.warning(f'XBRL Tag not found for: {ticker}')
                             continue
                         rec = RecordMetadata(
                                 cik = cik,
@@ -230,7 +230,7 @@ class Database:
                         )
                         recs.append(rec)
                     except Exception as e:
-                        print(e)
+                        logger.error(e)
                         continue
                     
             # save to db
@@ -240,7 +240,7 @@ class Database:
             except sql.exc.IntegrityError:
                 pass
             except Exception as e:
-                print(e)
+                logger.error(e)
         return True
 
 
@@ -341,7 +341,7 @@ class Database:
             except sql.exc.IntegrityError:
                 pass
             except Exception as e:
-                print(e)
+                logger.error(e)
         return True
 
 
@@ -472,7 +472,7 @@ class Database:
         s = filings.select()
         result = engine.execute(s)
         for row in result:
-            print (row)
+            logger.info(row)
         '''
         df = pd.read_sql_table(table_name, self.engine)
         return df

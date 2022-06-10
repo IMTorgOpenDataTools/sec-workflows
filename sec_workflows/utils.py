@@ -20,8 +20,7 @@ from mizani.breaks import date_breaks
 from mizani.formatters import date_format
 
 #builtin
-import logging
-#from asyncio.log import logger
+
 from collections import namedtuple
 import subprocess
 from subprocess import PIPE, STDOUT
@@ -41,6 +40,7 @@ from _constants import (
     DIR_SEC_DOWNLOADS,
     MAX_RETRIES,
     DEFAULT_TIMEOUT,
+    logger
 )
 
 url_firm_details = "https://data.sec.gov/submissions/CIK{}.json"
@@ -75,24 +75,7 @@ class TimeoutHTTPAdapter(HTTPAdapter):
 
 
 
-class Logger:
 
-    def __init__(self, log_file):
-        self.log_file = Path(log_file)
-
-    def create_logger(self):
-        """Create logger and associated file (if necessary)."""
-        if not self.log_file.parent.is_dir():
-            self.log_file.parent.mkdir(parents=True, exist_ok=True)
-        if not self.log_file.is_file():
-            open(self.log_file, 'x').close()
-
-        logging.basicConfig(filename=self.log_file, 
-                            encoding='utf-8', 
-                            level=logging.INFO, 
-                            format='%(asctime)s %(message)s')
-        logger = logging.getLogger(__name__)
-        return logger
 
 
 
@@ -114,7 +97,7 @@ def send_notification():
         result = p.communicate(input=body)[0]
         checks.append(result)
     except:
-        print("failed to send email notification.")
+        logger.error("failed to send email notification.")
     return checks
 
 
@@ -141,7 +124,7 @@ def api_request(session, type, cik, acct):
             filled_url = url_company_concept.format(long_cik, acct)
             keys = ('units','USD')
         case _:
-            print(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
+            logger.error(f'`api_request` type={type} is not an option (`firm_detail`, `concept`)')
             exit()
 
     #make request
@@ -152,7 +135,7 @@ def api_request(session, type, cik, acct):
                 items = edgar_resp.json()[keys[0]][keys[1]]
                 return items
     else:
-        print(f'edgar response returned status code {edgar_resp.status_code}')
+        logger.error(f'edgar response returned status code {edgar_resp.status_code}')
         return None
 
 
@@ -170,42 +153,12 @@ def remove_list_dups(lst, key):
 
 
 
-
-#for each cik:
-# get the most-recent 8-K/99.* filing
-# extract accts 
-# load into sqlite
-#add 8-K acct that is newer than 10-k
-'''
-def get_recent_financial_release(tickers, ciks):
-    """Search and download the most-recent 8-K/EX-99.* documents."""
-    def check(row): 
-        return "EX-99.1" in row.Type if type(row.Type) == str else False   #TODO:add 99.2+
-
-    start = date.today() - timedelta(days=90)
-    banks = [uc.Firm(ticker=bank[1]) for bank in tickers]
-    dl = Downloader(DIR_SEC_DOWNLOADS)
-    for bank in banks:
-        ticker = bank.get_info()["ticker"]
-        urls = dl.get_metadata("8-K",
-                            ticker,
-                            after = start.strftime("%Y-%m-%d")
-                            )
-    df = dl.filing_storage.get_dataframe(mode="document")
-    sel1 = df[(df["short_cik"].isin(ciks)) & (df["file_type"] == "8-K") & (df["FS_Location"] == "")]
-    mask = sel1.apply(check, axis=1)
-    sel2 = sel1[mask] 
-    lst_of_idx = sel2.index.tolist()
-    staged = dl.filing_storage.get_document_in_record( lst_of_idx )
-    downloaded_docs = dl.get_documents_from_url_list(staged)
-    return downloaded_docs
-'''
-
 def extract_accounts_from_documents(docs):
     for doc in docs:
         doc.FS_Location
         #TODO:extraction module
     pass
+
 
 
 def make_long_cik(cik):
@@ -216,6 +169,7 @@ def make_long_cik(cik):
     else:
         long_cik = short_cik
     return long_cik
+
 
 
 def scale_value(val, scale):
@@ -229,6 +183,7 @@ def scale_value(val, scale):
         case _:
             result_val = val
     return result_val
+
 
 
 def create_qtr(row):
@@ -253,8 +208,6 @@ def create_qtr(row):
         else:
             qtr = str(row['fp'])
     return f'{yr}-{qtr}'
-
-
 
 
 

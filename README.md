@@ -75,12 +75,14 @@ To be used in any venv,
   - mock api for tests
   - create test `main.py run` updates
   - how does report timespan increase? does it append new, or all-or-nothing?
-  - add logger to downloader, extractor
 * confidence level: 
   - create for extractor
   - update worflow
 * automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
   - similarity ranking across xbrl tags
+* downloader and extractor
+  - add logger to downloader, extractor
+  - replace Filing, Firm, ... automated populating from web via initialization with a `.initialize()` method to do it explicitly
 * extractor
   - Exception: 'NoneType' object is not iterable
   - 10+sec execution: bac

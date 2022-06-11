@@ -52,6 +52,10 @@ class Database:
         self.logger = logger
         self.path_download = Path(path_download)
 
+        self.downloader = Downloader(self.path_download)
+        self.extractor = Extractor(save_intermediate_files=True)
+        self.instance_doc = Instance_Doc()
+
         #db file
         check_file = self.check_db_file()
         if check_file:
@@ -68,9 +72,7 @@ class Database:
             except:
                 self.logger.warn('Failed to make downloads path')
 
-        self.downloader = Downloader(self.path_download)
-        self.extractor = Extractor(save_intermediate_files=True)
-        self.instance_doc = Instance_Doc()
+
 
 
     def check_db_file(self):
@@ -133,6 +135,95 @@ class Database:
             return False
 
 
+    def select_filing_records_for_download(self, firms, file_types, after_date):
+        """Get metadata for firms, then download them if not previously done.
+        * check if new filing records exist
+        * if new filing records are not in database, then get download them
+        """
+        ciks = [str(firm._cik) for firm in firms]
+        url_new = []
+        for firm in firms:
+            for filing in file_types:
+                url = self.downloader.get_metadata(filing,
+                                                    ticker_or_cik = firm.get_info()['ticker'], 
+                                                    after = after_date
+                                                    )
+                url_new.extend(url['new'])
+        #if not len(url_new) > 0: return True
+
+        # check if new filings are in database, get them if not
+        df_fs = self.downloader.filing_storage.get_dataframe( mode='document' )
+        sel1 = df_fs[(df_fs['short_cik'].isin( ciks )) 
+                & (df_fs['file_type'].isin( file_types ))
+                & (df_fs['Type'] == 'XML')
+                & (df_fs['Document'].str.contains('_htm.xml', case=True))
+                & (pd.to_datetime(df_fs['file_date']) > after_date)
+                ]
+        lst_of_idx = sel1.index.tolist()
+        staged = self.downloader.filing_storage.get_document_in_record( lst_of_idx )
+        updated_docs = self.downloader.get_documents_from_url_list( staged )
+        return updated_docs
+
+
+    def extract_values_and_load_into_record(self, firms, updated_docs):
+        """Extract and return records."""
+        selected_docs = list(updated_docs['new']) + list(updated_docs['previous'])
+        tickers = [(str(firm._cik), str(firm._ticker)) for firm in firms]
+        recs = []
+        for key, doc in selected_docs:
+            #prepare
+            if not doc.FS_Location: continue
+            cik = doc.FS_Location.parent.parent.name
+            ticker = [item[1] for item in tickers if item[0] == cik][0]
+            accn = doc.FS_Location.parent.name
+            key = f'{cik}|{accn}'
+            filing = self.downloader.filing_storage.get_record(key)
+            accts = self.extractor.config[ ticker ].accounts.items()
+
+            #extract xbrl values
+            start = pd.to_datetime( filing.file_date )
+            with open(doc.FS_Location, 'r') as f:
+                file_htm_xml = f.read()
+            df_doc, df = self.instance_doc.create_xbrl_dataframe( file_htm_xml )
+            fy = df_doc.value[df_doc['name']=='DocumentFiscalYearFocus'].values[0]
+            fp = df_doc.value[df_doc['name']=='DocumentFiscalPeriodFocus'].values[0]
+            end = df_doc.value[df_doc['name']=='DocumentPeriodEndDate'].values[0]
+            for acct_key, acct_rec in accts:
+                item = rec = None
+                try:
+                    xbrl_tag = acct_rec.xbrl                        #<<< TODO:try a list of similar xbrls until one hits
+                    subset = df[(df['concept'] == xbrl_tag )               
+                                & (df['dimension'] == '' ) 
+                                & (df['value_context']== '' )
+                                & (df['start'] < start )
+                                & (pd.isna(df['end']) == True )
+                                ]
+                    if subset.shape[0] > 0:
+                        item = subset.sort_values(by='start', ascending=False).to_dict('records')[0]        #TODO: progressive subsetting if dimesion is not empty
+                    else:
+                        logger.warning(f'XBRL Tag not found for: {ticker}')
+                        continue
+                    rec = RecordMetadata(
+                            cik = cik,
+                            accn = accn,
+                            form = filing.file_type,
+                            account = acct_key,
+                            value = item['value_concept'],                  
+                            account_title = acct_rec.table_account,
+                            xbrl_tag = xbrl_tag,
+                            fy = fy,
+                            fp = fp,
+                            end = end,
+                            filed = filing.file_date
+                    )
+                    recs.append(rec)
+                except Exception as e:
+                    logger.error(e)
+                    continue
+        return recs
+                    
+
+
     def get_quarterly_statements(self, firms, after):
         """Get certified quarterly earnings (10-K/-Q) for list of firms, after a date.
 
@@ -142,102 +233,32 @@ class Database:
         * download the instance document
         * extract the xbrl information
         * load into database table `records`
+
+        after format: "2022-01-01"
         """
-        # configure
+
+       # configure
         FILE_TYPES = ['10-K', '10-Q']
-        AFTER = after                           #"2022-01-01"
+        AFTER = after                           
 
         # check if table is initialized
         stmt = "SELECT * FROM " + self.table_name[0]["name"] + " WHERE form like '10-%'"
         df_10q = pd.read_sql(stmt, self.engine)
         #if df_10q.shape[0] > 0: return True
-        
-        # check if new filing records exist
-        ciks = [str(firm._cik) for firm in firms]
-        tickers = [(str(firm._cik), str(firm._ticker)) for firm in firms]
-        url_new = []
-        for firm in firms:
-            for filing in FILE_TYPES:
-                TICKER = firm.get_info()['ticker']
-                url = self.downloader.get_metadata(filing,
-                                    TICKER, 
-                                    after=AFTER
-                                    )
-                url_new.extend(url['new'])
-        #if not len(url_new) > 0: return True
 
-        # check if new filings are in database, get them if not
-        df_fs = self.downloader.filing_storage.get_dataframe(mode='document')
-        sel1 = df_fs[(df_fs['short_cik'].isin(ciks)) 
-                & (df_fs['file_type'].isin(FILE_TYPES))
-                & (df_fs['Type'] == 'XML')
-                & (df_fs['Document'].str.contains('_htm.xml', case=True))
-                & (pd.to_datetime(df_fs['file_date']) > AFTER)
-                ]
-        lst_of_idx = sel1.index.tolist()
-        staged = self.downloader.filing_storage.get_document_in_record( lst_of_idx )
-        updated_docs = self.downloader.get_documents_from_url_list(staged)
-
+        # select filing records
+        updated_docs = self.select_filing_records_for_download(firms, 
+                                                            file_types = FILE_TYPES,
+                                                            after_date = AFTER
+                                                            )
         accns = [doc[0].split('|')[1] for doc in updated_docs['new']]
         df_new_filings = df_10q[df_10q['accn'].isin(accns)]
         if set( df_new_filings['accn'].to_list() ) == set( accns ):
             return True
         else:
-
             # prepare and load the new data items
-            selected_docs = list(updated_docs['new']) + list(updated_docs['previous'])
-            recs = []
-            for key, doc in selected_docs:
-                #prepare
-                if not doc.FS_Location: continue
-                cik = doc.FS_Location.parent.parent.name
-                ticker = [item[1] for item in tickers if item[0] == cik][0]
-                accn = doc.FS_Location.parent.name
-                key = f'{cik}|{accn}'
-                filing = self.downloader.filing_storage.get_record(key)
-                accts = self.extractor.config[ ticker ].accounts.items()
+            recs = self.extract_values_and_load_into_record(firms, updated_docs)
 
-                #extract xbrl values
-                start = pd.to_datetime( filing.file_date )
-                with open(doc.FS_Location, 'r') as f:
-                    file_htm_xml = f.read()
-                df_doc, df = self.instance_doc.create_xbrl_dataframe( file_htm_xml )
-                fy = df_doc.value[df_doc['name']=='DocumentFiscalYearFocus'].values[0]
-                fp = df_doc.value[df_doc['name']=='DocumentFiscalPeriodFocus'].values[0]
-                end = df_doc.value[df_doc['name']=='DocumentPeriodEndDate'].values[0]
-                for acct_key, acct_rec in accts:
-                    item = rec = None
-                    try:
-                        xbrl_tag = acct_rec.xbrl                        #<<< TODO:try a list of similar xbrls until one hits
-                        subset = df[(df['concept'] == xbrl_tag )               
-                                    & (df['dimension'] == '' ) 
-                                    & (df['value_context']== '' )
-                                    & (df['start'] < start )
-                                    & (pd.isna(df['end']) == True )
-                                    ]
-                        if subset.shape[0] > 0:
-                            item = subset.sort_values(by='start', ascending=False).to_dict('records')[0]        #TODO: progressive subsetting if dimesion is not empty
-                        else:
-                            logger.warning(f'XBRL Tag not found for: {ticker}')
-                            continue
-                        rec = RecordMetadata(
-                                cik = cik,
-                                accn = accn,
-                                form = filing.file_type,
-                                account = acct_key,
-                                value = item['value_concept'],                  
-                                account_title = acct_rec.table_account,
-                                xbrl_tag = xbrl_tag,
-                                fy = fy,
-                                fp = fp,
-                                end = end,
-                                filed = filing.file_date
-                        )
-                        recs.append(rec)
-                    except Exception as e:
-                        logger.error(e)
-                        continue
-                    
             # save to db
             df = pd.DataFrame(recs, columns=RecordMetadata._fields)
             try:

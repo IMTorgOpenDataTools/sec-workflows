@@ -65,21 +65,20 @@ To be used in any venv,
 
 ## TODO
 
-* deployment / lsf, grid
+* (not critical) deployment / lsf, grid
   - tidy not being found
   - how to write stdout,stderr to folder?
   - job description email notification not sent
-* workflow
+* (mostly done) workflow
   - ~~add logger and change print() to log()~~
   - ~~only send email on change~~
-  - mock api for tests
-  - create test `main.py run` updates
+  - ~~mock api for tests~~
+  - ~~create test `main.py run` updates~~
+  - database.py decompose parts, determine through tests
   - how does report timespan increase? does it append new, or all-or-nothing?
-* confidence level: 
+* confidence level 
   - create for extractor
   - update worflow
-* automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
-  - similarity ranking across xbrl tags
 * downloader and extractor
   - add logger to downloader, extractor
   - replace Filing, Firm, ... automated populating from web via initialization with a `.initialize()` method to do it explicitly
@@ -91,6 +90,8 @@ To be used in any venv,
   - wksheet-2 definitions (website, gaap taxonomy .xml)
 * report: 
   - wksheet-2 definitions (website, gaap taxonomy .xml)
+* automate: create config with topic (ACL) and list of associated xbrl tags (maybe across history of bank filings)
+  - similarity ranking across xbrl tags
 
 
 ## References

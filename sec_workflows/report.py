@@ -59,17 +59,20 @@ class Report:
             case 'long': 
                 result = self.report_long(self.output_path)
             case 'accounting_policy':
-                df_long = self.report_long() 
-                list_of_df_tables = self.report_accounting_policy_preparation(df_long)
+                df_long = self.report_long()
+                df_valid = self.validate(df_long, self.output_path) 
+                list_of_df_tables = self.report_accounting_policy_preparation(df_long, df_valid)
                 result = self.report_accounting_policy_completion(list_of_df_tables)
             case 'trend':
                 df_long = self.report_long()
                 #result = template(df_long, dir_path)
-                df_ACL = self.report_accounting_policy_preparation(df_long)
+                df_valid = self.validate(df_long, self.output_path) 
+                df_ACL = self.report_accounting_policy_preparation(df_long, df_valid)
                 result = self.trend(df_ACL, dir_path)
             case 'validate':
                 df_long = self.report_long()
-                result = self.validate(df_long, self.output_path)
+                df_valid = self.validate(df_long, self.output_path)
+                result = True if df_valid.shape[0] > 0 else False
 
         return result
 
@@ -93,7 +96,7 @@ class Report:
         return df
 
 
-    def report_accounting_policy_preparation(self, df_long):
+    def report_accounting_policy_preparation(self, df_long, df_valid):
         """Report preparation for accounting policy by returning a list of 
         dataframes, one for each metric.
         """
@@ -139,7 +142,7 @@ class Report:
                 dfsLoans[qtr] = df_tmp3
 
         # create df for metadata and each metric by adding appropriate columns for each qtr
-        meta = namedtuple('meta_record', ['cik', 'accn', 'form', 'titles'])
+        meta = namedtuple('meta_record', ['cik', 'accn', 'form', 'titles', 'confidence'])
         df_Meta = df_result.copy(deep=True)
         df_ACL = df_result.copy(deep=True)
         df_Loans = df_result.copy(deep=True)
@@ -151,11 +154,16 @@ class Report:
                 df_Meta[col] = None
                 dfsACL[key]['cik'] = dfsACL[key].index
                 for row in dfsACL[key].to_dict('records'):
+
+                    accn_col = 'accn_10q' if row['form'] in ['10-K','10-Q'] else 'accn_8k'
+                    records = df_valid[(df_valid['yr_qtr'] == key) & (df_valid[accn_col] == row['accn'])].to_dict('records')
+                    rec_valid = records[0] if len(records) > 0 else {'conf_ACL': 0.0, 'conf_Loans': 0.0}
                     rec = meta(
                         cik = str(row['cik']),
                         accn = row['accn'],
                         form = row['form'],
-                        titles= row['titles']
+                        titles = row['titles'],
+                        confidence = {'ACL': rec_valid['conf_ACL'], 'Loans': rec_valid['conf_Loans']}
                     )
                     df_Meta[col].loc[rec.cik] = rec
 
@@ -236,11 +244,12 @@ class Report:
                     tmp_titles = ast.literal_eval(rec.titles) if (rec and rec.titles) else None
                     selection = [item for item in tmp_titles if item[0]==acct_topic] if tmp_titles else None
                     titles = selection[0] if selection else None
-                    meta_value = {'cik':'None', 'accn':'None', 'form':'None', 'title':'None', 'xbrl':'None'}
+                    meta_value = {'cik':'None', 'accn':'None', 'form':'None', 'title':'None', 'xbrl':'None', 'confidence':'None'}
                     if rec:
                         meta_value['cik'] = rec.cik           #df_meta.index.tolist()[idxR]
                         meta_value['accn'] = rec.accn
                         meta_value['form'] = rec.form
+                        meta_value['confidence'] = rec.confidence[acct_topic]
                         if titles:
                             meta_value['title'] = titles[1]
                             meta_value['xbrl'] = titles[2]
@@ -254,12 +263,12 @@ class Report:
                     # write
                     if pd.isna(value): 
                         url_filled = url.format(cik=meta_value['cik'], accn_wo_dash=meta_value['accn'].replace('-',''), accn=meta_value['accn'])
-                        comment = f'Form: {meta_value["form"]} \nTitle: {meta_value["title"]} \nXBRL: {meta_value["xbrl"]} \nconfidence: 0 \ndoc url: {url_filled}'
+                        comment = f'Form: {meta_value["form"]} \nTitle: {meta_value["title"]} \nXBRL: {meta_value["xbrl"]} \nValidated: {meta_value["confidence"]} \nDoc url: {url_filled}'
                         worksheet.write_string(data_row, col, '-', missing_format)
                         worksheet.write_comment(data_row, col, comment, comment_format)
                     else:
                         url_filled = url.format(cik=meta_value['cik'], accn_wo_dash=meta_value['accn'].replace('-',''), accn=meta_value['accn'])
-                        comment = f'Form: {meta_value["form"]} \nTitle: {meta_value["title"]} \nXBRL: {meta_value["xbrl"]} \nconfidence: 1 \ndoc url: {url_filled}'
+                        comment = f'Form: {meta_value["form"]} \nTitle: {meta_value["title"]} \nXBRL: {meta_value["xbrl"]} \nValidated: {meta_value["confidence"]} \nDoc url: {url_filled}'
                         worksheet.write_number(data_row, col, value, data_format)
                         worksheet.write_comment(data_row, col, comment, comment_format)
 
@@ -408,10 +417,30 @@ class Report:
         """Validate 8-K earnings against associated 10-K/-Q quarterly statements.
         If not exact, then these numbers should be close.
         """
+        def get_confidence(df, acct):
+            old_col = 'diff_'+acct
+            new_col = old_col.replace('diff_','conf_')
+            result = df[['cik','yr_qtr_10q']]
+            result[new_col] = 0
+            for cik in df.value_counts('cik').index:
+                cols = ['cik', 'yr_qtr_10q', old_col]                          #[['cik', 'yr_qtr_10q', 'ACL_10q', 'ACL_8k', acct]]
+                tmp = df[df['cik']==cik][cols].copy('deep')
+                tmp[new_col] = 1 - (1 / (1 + np.exp( -abs(tmp[old_col]) )))    # 1-sigmoid with range: 0 - inf
+                tmp[new_col][tmp[old_col] == 0] = 1
+                tmp[new_col][tmp[old_col].isna() == True] = 0
+                #tmp[new_col][tmp[new_col] != 0] = tmp[acct].sum() / tmp[acct].__len__()
+                result.loc[tmp.index, new_col] = tmp[new_col]
+            conf = result[new_col]
+            return conf
+
+        #prepare
         suffixes = ('_10q', '_8k')
         df_qtrly = df_long[df_long['form'].isin(['10-K','10-Q'])]
+        df_qtrly['fp'].replace({'FY':'Q4'}, inplace=True)
         df_8k = df_long[~df_long['form'].isin(['10-K','10-Q'])]
         df_tmp = pd.merge(df_qtrly, df_8k, on=['fy','fp','cik'], how='left', suffixes=suffixes)
+
+        #process for each account
         for acct in LIST_ALL_ACCOUNTS:
             left = acct+suffixes[0]
             right = acct+suffixes[1]
@@ -420,11 +449,18 @@ class Report:
             col_diff = {'_spacer'+acct: ' - ',
                         '_'+left: df_tmp[left],
                         '_'+right: df_tmp[right],
-                        'diff_'+acct: df_tmp[left] - df_tmp[right]
+                        'diff_'+acct: df_tmp[left] - df_tmp[right],
+                        'conf_'+acct: 0
                         }
             df_tmp = df_tmp.assign(**col_diff)
+            df_tmp['conf_'+acct] = get_confidence(df = df_tmp, acct = acct)
             #df_tmp.drop(columns=[left, right], inplace=True)
-        df_valid = df_tmp
+
+        #output
+        cols_merged = ['cik', 'yr_qtr_10q', 'accn_10q','accn_8k', 'ACL_10q','ACL_8k', 'conf_ACL', 'Loans_10q', 'Loans_8k', 'conf_Loans']
+        cols_rename = {'yr_qtr_10q':'yr_qtr'}
+        df_valid = df_tmp[cols_merged].rename(columns = cols_rename)
+
         file_path = Path(dir_path) / 'report_validation.csv'
         df_valid.to_csv(file_path, index=False)
-        return True
+        return df_valid

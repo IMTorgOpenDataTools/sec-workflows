@@ -63,6 +63,22 @@ To be used in any venv,
 
 
 
+
+## Testing
+
+Use the following to ensure tests are configured, then run the tests.
+
+```
+pipenv run pip list
+pytest --fixtures
+pipenv install pytest-mock           #must be available
+pytest --collect-only
+pytest
+```
+
+
+
+
 ## TODO
 
 * (not critical) deployment / lsf, grid
@@ -74,6 +90,7 @@ To be used in any venv,
   - ~~only send email on change~~
   - ~~mock api for tests~~
   - ~~create test `main.py run` updates~~
+  - ~~validation score~~
   - database.py decompose parts, determine through tests
   - how does report timespan increase? does it append new, or all-or-nothing?
 * confidence level 

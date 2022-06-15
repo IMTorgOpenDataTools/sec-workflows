@@ -10,6 +10,7 @@ __license__ = "MIT"
 import pandas as pd
 
 #builtin
+import shutil
 from collections import namedtuple
 import subprocess
 from subprocess import PIPE, STDOUT
@@ -242,7 +243,7 @@ def delete_folder(pth) :
             delete_folder(sub)
         else :
             sub.unlink()
-    pth.rmdir()
+    shutil.rmtree(pth)
 
 
 

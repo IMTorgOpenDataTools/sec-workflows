@@ -18,6 +18,7 @@ import requests
 #lib
 from sec_workflows.database import Database
 from sec_workflows.utils import (
+    delete_folder,
     send_notification, 
     api_request, 
     remove_list_dups,
@@ -105,7 +106,7 @@ def resource_db():
     del db
     log_file.unlink() if log_file.is_file() else None
     db_file.unlink() if db_file.is_file() else None
-    log_file.parent.rmdir()
+    delete_folder(log_file.parent)
 
 
 def test_poll_sec_edgar(mocker, resource_db):

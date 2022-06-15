@@ -166,7 +166,7 @@ class TestResourceDb:
         from_sql = list(recs[0])
         assert from_test[:-1] == from_sql[:-1]
 
-    def test_change_in_8k_filing():
+    def test_change_in_8k_filing(self, resource_db):
         #mock poll_sec_edgar()
         #mock self.downloader.get_metadata(filing, TICKER, AFTER)
         #test db.get_quarterly_statements()

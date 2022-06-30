@@ -1,2 +1,3 @@
-name,address,notify
-Joe Smith,joe.smith@gmail.com,yes
+name,address,notify,admin
+Joe Smith,joe.smith@gmail.com,True,True
+Joe Blo,joe.blow@gmail.com,True,False

@@ -17,6 +17,7 @@ import argparse
 #my libs
 from database import Database
 from report import Report
+from sec_workflows.output import Output
 from utils import (
     send_notification,
     poll_sec_edgar,
@@ -27,6 +28,7 @@ sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
     FILE_LOG,
     FILE_DB,
+    EMAIL_NETWORK_DRIVE,
     meta,
     LIST_ALL_FIRMS,
     LIST_ALL_TABLES,
@@ -47,6 +49,11 @@ db = Database(db_file = FILE_DB,
 report = Report(db = db, 
                 output_path=DIR_REPORTS
                 )
+output = Output(
+                emails_file_or_dictlist=[{'name':'Joe Smith', 'address':'joe.smith@gmail.com', 'notify':True, 'admin':True}],
+                email_network_drive = EMAIL_NETWORK_DRIVE,
+                logger = logger
+)
 
 
 #processes
@@ -95,7 +102,7 @@ def run_process():
             end_records = db.query_database('records').shape[0]
             if end_records > start_records:
                 report.create_report(type='accounting_policy')
-                send_notification()
+                output.send_notification(error=False)
         else:
             logger.info('no change to server')
         secs = MINUTES_BETWEEN_CHECKS * 60

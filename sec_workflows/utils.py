@@ -26,7 +26,6 @@ from urllib3.util.retry import Retry
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
-    FILE_EMAILS,
     MAX_RETRIES,
     DEFAULT_TIMEOUT,
     logger
@@ -64,30 +63,6 @@ class TimeoutHTTPAdapter(HTTPAdapter):
 
 
 
-
-
-
-
-def send_notification():
-    """Send email notification that report is updated."""
-    subject = 'SEC 8-K Update'
-    body = b'''
-    Dear Sir / Ma'am, 
-    This is a notification that the SEC Earnings report is updated. 
-    You can find it in the following network drive: 
-        `\hqfile01\sec_edgar\sec_edgar\`
-    '''
-    df_emails = pd.read_csv(FILE_EMAILS)
-    emails = df_emails['address'].tolist()
-    checks = []
-    bashCommand = ["mailx", "-s", subject, *emails]
-    try:
-        p = subprocess.Popen(bashCommand, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
-        result = p.communicate(input=body)[0]
-        checks.append(result)
-    except:
-        logger.error("failed to send email notification.")
-    return checks
 
 
  

@@ -17,6 +17,7 @@ import requests
 
 #lib
 from sec_workflows.database import Database
+from sec_workflows.output import Output
 from sec_workflows.utils import (
     delete_folder,
     send_notification, 
@@ -29,17 +30,36 @@ from sec_workflows.utils import (
 )
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
+    EMAIL_NETWORK_DRIVE,
     meta,
     LIST_ALL_TABLES,
-    Logger
+    Logger,
+    logger
 )
 
 
 
-def test_send_notification():
+output = Output(
+    emails_file_or_dictlist=[{'name':'Joe Smith', 'address':'joe.smith@gmail.com', 'notify':True, 'admin':True}],
+    email_network_drive = EMAIL_NETWORK_DRIVE,
+    logger = logger
+)
+
+
+
+
+
+
+def test_send_notification_success():
     #this will fail if `mailx` is not available
-    checks = send_notification()
+    checks = output.send_notification(error=False)
     assert checks != []
+
+
+def test_send_notification_failure():
+    #this will fail if `mailx` is not available
+    checks = output.send_notification(error=True)
+    assert checks == []
 
 
 def test_api_request():

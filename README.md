@@ -85,6 +85,7 @@ pytest
   - tidy not being found
   - how to write stdout,stderr to folder?
   - job description email notification not sent
+  - ~~email and network drive fixed~~
 * (mostly done) workflow
   - ~~add logger and change print() to log()~~
   - ~~only send email on change~~
@@ -100,6 +101,7 @@ pytest
   - add logger to downloader, extractor
   - replace Filing, Firm, ... automated populating from web via initialization with a `.initialize()` method to do it explicitly
 * extractor
+  - taxonomy download
   - Exception: 'NoneType' object is not iterable
   - 10+sec execution: bac
   - bac Loans
@@ -114,3 +116,4 @@ pytest
 ## References
 
 * [cmdln python debugger, pdb](https://qxf2.com/blog/debugging-in-python-using-pytest-set_trace/)
+* [sec edgar taxonomy info](https://sec.gov/info/edgar/edgartaxonomies.shtml)

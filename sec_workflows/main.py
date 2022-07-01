@@ -17,15 +17,15 @@ import argparse
 #my libs
 from database import Database
 from report import Report
-from sec_workflows.output import Output
+from output import Output
 from utils import (
-    send_notification,
     poll_sec_edgar,
     reset_files
 )
 import sys
 sys.path.append(Path('config').absolute().as_posix() )
 from _constants import (
+    FILE_EMAILS,
     FILE_LOG,
     FILE_DB,
     EMAIL_NETWORK_DRIVE,
@@ -50,7 +50,7 @@ report = Report(db = db,
                 output_path=DIR_REPORTS
                 )
 output = Output(
-                emails_file_or_dictlist=[{'name':'Joe Smith', 'address':'joe.smith@gmail.com', 'notify':True, 'admin':True}],
+                emails_file_or_dictlist=FILE_EMAILS,
                 email_network_drive = EMAIL_NETWORK_DRIVE,
                 logger = logger
 )

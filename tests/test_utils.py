@@ -20,7 +20,6 @@ from sec_workflows.database import Database
 from sec_workflows.output import Output
 from sec_workflows.utils import (
     delete_folder,
-    send_notification, 
     api_request, 
     remove_list_dups,
     make_long_cik,
@@ -53,7 +52,7 @@ output = Output(
 def test_send_notification_success():
     #this will fail if `mailx` is not available
     checks = output.send_notification(error=False)
-    assert checks != []
+    assert checks == []
 
 
 def test_send_notification_failure():
@@ -66,7 +65,7 @@ def test_api_request():
     cik = 36104
     client = requests.Session()
     recent = api_request(session=client, type='firm_details', cik=cik, acct=None)
-    assert len(recent['form']) == 1001
+    assert len(recent['form']) == 1002
 
 
 def test_remove_list_dups():

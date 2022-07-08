@@ -178,7 +178,7 @@ class Database:
             accn = doc.FS_Location.parent.name
             key = f'{cik}|{accn}'
             filing = self.downloader.filing_storage.get_record(key)
-            accts = self.extractor.config[ ticker ].accounts.items()
+            accts = self.extractor.config.get()[ ticker ].accounts.items()
 
             #extract xbrl values
             start = pd.to_datetime( filing.file_date )
@@ -341,16 +341,16 @@ class Database:
                 items_key = list(items.keys())[0]
                 for acct, val in items[items_key].items():
                     if type(val) == str: continue
-                    if doc.Type != self.extractor.config[ticker].accounts[acct].exhibits: continue
-                    scale = self.extractor.config[ticker].accounts[acct].scale
+                    if doc.Type != self.extractor.config.get()[ticker].accounts[acct].exhibits: continue
+                    scale = self.extractor.config.get()[ticker].accounts[acct].scale
                     rec = RecordMetadata(
                                     cik = str(doc_meta['short_cik']),
                                     accn = str(doc_meta['accession_number']),
                                     form = f"{doc_meta['file_type']}/{doc.Type}",
                                     account = acct,
                                     value = scale_value(val, scale),
-                                    account_title = self.extractor.config[ticker].accounts[acct].table_account,
-                                    xbrl_tag = self.extractor.config[ticker].accounts[acct].xbrl,
+                                    account_title = self.extractor.config.get()[ticker].accounts[acct].table_account,
+                                    xbrl_tag = self.extractor.config.get()[ticker].accounts[acct].xbrl,
                                     fy = np.nan,
                                     fp = np.nan,
                                     end = np.nan,

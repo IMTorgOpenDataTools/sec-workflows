@@ -65,7 +65,7 @@ def test_api_request():
     cik = 36104
     client = requests.Session()
     recent = api_request(session=client, type='firm_details', cik=cik, acct=None)
-    assert len(recent['form']) == 1002
+    assert len(recent['form']) == 1000
 
 
 def test_remove_list_dups():
@@ -143,4 +143,4 @@ def test_poll_sec_edgar(mocker, resource_db):
     after_date = '2022-05-01'
     changed_firms = poll_sec_edgar(resource_db, firms, after_date)
     mock_request.call_args.__str__() == "call(session=<requests.sessions.Session object at 0x7f065f9cbf70>, type='firm_details', cik=36104, acct=None)"
-    assert changed_firms.__repr__() == "{'8k': {US BANCORP DE}, '10kq': set()}"
+    assert changed_firms.__repr__() == "{'8k': {US BANCORP \DE\}, '10kq': set()}"

@@ -17,6 +17,9 @@ from plotnine import *
 from mizani.breaks import date_breaks
 from mizani.formatters import date_format
 
+from sec_edgar_extractor.extract import Extractor
+from sec_edgar_extractor.documentation import Documentation
+
 #built-in
 from asyncio.log import logger
 from pathlib import Path
@@ -35,6 +38,15 @@ from _constants import (
     LIST_ALL_ACCOUNTS,
     LIST_ALL_FIRMS
 )
+
+
+ex = Extractor(save_intermediate_files=True)
+doc = Documentation()
+doc.load_documents()
+
+df_config = ex.config.get(mode='df')
+xbrl_labels = set( df_config['xbrl'].tolist() )
+doc_records = doc.get_records(xbrl_labels)
 
 
 
@@ -278,7 +290,9 @@ class Report:
         #file_path = './archive/report/report_acl_acct.xlsx'
         workbook = xlsxwriter.Workbook(file_path)
         worksheet = workbook.add_worksheet('Large Banks')
+        docsheet = workbook.add_worksheet('Documentation')
 
+        # worksheet
         banks = df_ACL.Bank.tolist()
         col_start = 2
         row_start = 0
@@ -325,9 +339,20 @@ class Report:
         df_col_offset = 0
         create_xlsx_section(worksheet, row_start, section2_col_start, df_col_offset, df_Loans, df_Meta, acct_topic='Loans', qtrs=qtrs, hdr_title='Loans')
         create_xlsx_section(worksheet, row_start, section3_col_start, df_col_offset, df_Ratio, df_Meta, acct_topic='ACL', qtrs=qtrs, hdr_title='Coverage')
-        workbook.close()
+        
+
+        # docsheet
+        for idx, doc in enumerate(doc_records):
+            for col, val in enumerate(doc.items()):
+                if val[1]:
+                    docsheet.write_string(idx+1, col, val[1])
+        for col, val in enumerate(doc.items()):
+            if val[0]:
+                docsheet.write_string(0, col, val[0])
+        
 
         # return
+        workbook.close()
         return df_ACL
 
 

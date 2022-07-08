@@ -125,7 +125,7 @@ LIST_ALL_FIRMS = load_firms(FILE_FIRMS)
 extractor = Extractor(save_intermediate_files=True)
 config = extractor.config
 tmp = []
-[tmp.extend(item.accounts.keys()) for item in config.values()]
+[tmp.extend(item.accounts.keys()) for item in config.get().values()]
 LIST_ALL_ACCOUNTS= list(set(tmp))
 
 

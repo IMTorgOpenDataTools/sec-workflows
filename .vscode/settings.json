@@ -1,9 +1,17 @@
 {
     "python.testing.pytestArgs": [
-        "."
+        "tests"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
+    "python.testing.pytestPath": "/home/vscode/.local/share/virtualenvs/Prj-sec-edgar-extract-F_HIpqfc/bin/pytest",
+    "python.pipenvPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
+    "python.linting.pylintPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
+    "python.autoComplete.extraPaths": ["/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python"],
+    "python.defaultInterpreterPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
+    "python.analysis.extraPaths": [
+        "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/"
+    ],
     "files.exclude": {
         "**/.git": true,
         "**/.svn": true,
@@ -12,12 +20,5 @@
         "**/.DS_Store": true,
         "**/*.pyc": true,
         "**/__pycache__": true
-    },
-    "python.pipenvPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
-    "python.linting.pylintPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
-    "python.autoComplete.extraPaths": ["/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python"],
-    "python.defaultInterpreterPath": "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/bin/python",
-    "python.analysis.extraPaths": [
-        "/home/vscode/.local/share/virtualenvs/Prj-sec_workflows-F_HIpqfc/"
-    ]
+    }
 }

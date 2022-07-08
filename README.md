@@ -9,7 +9,7 @@ Typical configuration tasks in `config/`:
 
 * `ciks.csv` contain correct bank cik 
 * `emails.csv` used for appropriate notifications
-* `_constants.py, report_output_path` for reports to specific directory
+* `_constants.py, DIR_REPORTS` for reports to specific directory
 * addditional `_constants.py` paths include:
   - `DIR_SEC_DOWNLOADS`
   - `FILE_LOG`

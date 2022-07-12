@@ -58,6 +58,7 @@ output = Output(
 
 #processes
 def initialize_process():
+    """Initialize the database."""
     years = timedelta(weeks = 52)
     start_date = datetime.now().date() - years
     after_date = start_date.strftime("%Y-%m-%d") 
@@ -75,6 +76,7 @@ def initialize_process():
 
 
 def run_process():
+    """Run process to poll API and update report event of new filings."""
     loop = True                                                                 #setup based on desired loop style
     while loop:
         days = timedelta(days = 3)
@@ -111,6 +113,7 @@ def run_process():
 
 
 def reports_process():
+    """Create all reports."""
     report.create_report(type='long')
     report.create_report(type='accounting_policy')
     #create_report(type='trend', db=db, output_path=DIR_REPORTS)
@@ -122,7 +125,7 @@ def reports_process():
 
 
 def main(args):
-    """Application entrypoint"""
+    """Main workflow."""
     logger.info(f'Starting process in {args.mode[0]} mode')
 
     #check db file and schema
@@ -153,10 +156,10 @@ if __name__ == "__main__":
     """Main entry point to the application.
 
     App start is executed in one of the following two modes:
-      * `init`ialize system by creating new db with records or validate current records if db is present
+      * `init`ialize system by creating new db with records
       * `run` the listener for updates (8-K, 10-K/-Q), periodically, then create a report and output to directory
-    
-    ....
+      * `report` on all aspects of the system
+      * `RESET_FILES` by removing intermediate extractor files within `archive/downloades/`
     """
     parser = argparse.ArgumentParser()
 

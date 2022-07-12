@@ -79,7 +79,7 @@ TODO
 ## TODO
 
 * phase-II:automated account discovery
-  - update config/Firm_Account_Info.csv
+  - ~~update config/Firm_Account_Info.csv to reflect current use~~
   - mod config/Firm_Account_Info.csv: topic-based, incorporate timespans for each topic-title-tag (reporting changes over time)
   - use tag's name, definition, codification to determine similarity amongst all xbrl tags
   - determine best fit xbrl tag for specific topic, for any firm

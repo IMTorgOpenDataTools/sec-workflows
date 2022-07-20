@@ -41,11 +41,12 @@ from _constants import (
 
 
 ex = Extractor(save_intermediate_files=True)
+ex.config.load_config_from_file()
+df_config = ex.config.get(mode='df_no_filter')
+xbrl_labels = set( df_config['xbrl'].tolist() )
+
 doc = Documentation()
 doc.load_documents()
-
-df_config = ex.config.get(mode='df')
-xbrl_labels = set( df_config['xbrl'].tolist() )
 doc_records = doc.get_records(xbrl_labels)
 
 

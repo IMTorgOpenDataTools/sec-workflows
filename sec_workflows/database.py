@@ -74,7 +74,7 @@ class Database:
 
 
 
-
+    # checks and validation
     def check_db_file(self):
         """Check the database file exists."""
         path = self.db_file
@@ -135,6 +135,8 @@ class Database:
             return False
 
 
+
+    # supporting functionality
     def select_filing_records_for_download(self, firms, file_types, after_date):
         """Get metadata for firms, then download them if not previously done.
         * check if new filing records exist
@@ -151,7 +153,7 @@ class Database:
                 url_new.extend(url['new'])
         #if not len(url_new) > 0: return True
 
-        # check if new filings are in database, get them if not
+        #check if new filings are in database, get them if not
         df_fs = self.downloader.filing_storage.get_dataframe( mode='document' )
         sel1 = df_fs[(df_fs['short_cik'].isin( ciks )) 
                 & (df_fs['file_type'].isin( file_types ))
@@ -178,10 +180,12 @@ class Database:
             accn = doc.FS_Location.parent.name
             key = f'{cik}|{accn}'
             filing = self.downloader.filing_storage.get_record(key)
-            accts = self.extractor.config.get()[ ticker ].accounts.items()
 
             #extract xbrl values
             start = pd.to_datetime( filing.file_date )
+            #TODO:report_date = filing.report_date
+            #accts = self.extractor.config.get(report_date)[ ticker ].accounts.items()
+            accts = self.extractor.config.get()[ ticker ].accounts.items()
             with open(doc.FS_Location, 'r') as f:
                 file_htm_xml = f.read()
             df_doc, df = self.instance_doc.create_xbrl_dataframe( file_htm_xml )
@@ -337,6 +341,7 @@ class Database:
                 doc_meta = sel2[sel2.Document == doc.Document].to_dict('record')[0]
 
                 # process with extractor
+                #doc_meta['report_date']
                 items = self.extractor.execute_extract_process(doc=doc, ticker=ticker)
                 items_key = list(items.keys())[0]
                 for acct, val in items[items_key].items():

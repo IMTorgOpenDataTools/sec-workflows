@@ -123,10 +123,11 @@ LIST_ALL_FIRMS = load_firms(FILE_FIRMS)
 
 # initialize extractor
 extractor = Extractor(save_intermediate_files=True)
-config = extractor.config
-tmp = []
-[tmp.extend(item.accounts.keys()) for item in config.get().values()]
-LIST_ALL_ACCOUNTS= list(set(tmp))
+extractor.config.load_config_from_file()
+accounts_domain = []
+[accounts_domain.extend(item.accounts.keys()) 
+    for item in extractor.config.get(report_date=None, mode='firm_records_no_filter').values()]
+LIST_ALL_ACCOUNTS = list(set(accounts_domain))
 
 
 

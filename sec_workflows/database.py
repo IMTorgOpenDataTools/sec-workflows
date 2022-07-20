@@ -21,7 +21,7 @@ from sec_edgar_extractor.instance_doc import Instance_Doc
 #built-in
 from asyncio.log import logger
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 #my libs
 import sys
@@ -507,3 +507,11 @@ class Database:
         '''
         df = pd.read_sql_table(table_name, self.engine)
         return df
+
+
+    def get_date_most_recent_record(self):
+        """Get the date of most-recently extracted db record."""
+        df = pd.read_sql_table(self.table_name[0]['name'], self.engine)
+        df.sort_values(by='filed', ascending=False, inplace=True)
+        date_last_record = pd.to_datetime(df.filed.values[0])
+        return date_last_record

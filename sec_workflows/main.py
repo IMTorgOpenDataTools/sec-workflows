@@ -78,10 +78,9 @@ def initialize_process():
 def run_process():
     """Run process to poll API and update report event of new filings."""
     loop = True                                                                 #setup based on desired loop style
-    while loop:
-        days = timedelta(days = 3)                                              #TODO: change to last filing in db
-        start_date = datetime.now().date() - days
-        after_date = start_date.strftime("%Y-%m-%d")
+    while loop:                                         
+        start_query_date = db.get_date_most_recent_record() 
+        after_date = start_query_date.strftime("%Y-%m-%d")
         start_records = db.query_database('records').shape[0]
 
         changed_firms = poll_sec_edgar(db, LIST_ALL_FIRMS, after_date)

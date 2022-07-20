@@ -25,7 +25,7 @@ from sec_edgar_downloader import UrlComponent as uc
 
 # file managmeent
 FILE_EMAILS = './config/emails.csv'
-FILE_FIRMS = './config/ciks_test.csv'
+FILE_FIRMS = './config/ciks.csv'
 
 DIR_REPORTS = './archive/report'
 DIR_SEC_DOWNLOADS = './archive/downloads'

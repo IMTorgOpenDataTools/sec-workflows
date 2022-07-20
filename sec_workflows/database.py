@@ -392,23 +392,24 @@ class Database:
             df_wide_total.sort_values(by="filed", ascending=False, inplace=True)
             df_wide_total['yr_qtr'] = df_wide_total.apply(create_qtr, axis=1)
             #TODO: apply FilingMetadata before importing
-            try:
-                df_wide_total.to_sql(self.table_name[1]['name'], 
-                        con=self.engine,
-                        if_exists="append", 
-                        index=False
-                        )
-            except sql.exc.IntegrityError as e:
-                logger.warning("Unique key violation on insert")
-            else:
-                logger.info(f"Inserted {df_wide_total.shape[0]} records to table {self.table_name[1]['name']}")
+
+            # load into db
+            records_inserted = self.insert_df_to_table(df=df_wide_total,
+                                                        table_name=self.table_name[1]['name'],
+                                                        connection=self.engine
+                                                        )
+            logger.info(f'Inserted {records_inserted} 10-K/-Q records to table {self.table_name[1]["name"]}')
             return True
         else:
             return False
 
 
     def format_raw_earnings_records(self):
-        """Format earnings records for ingest into `filings` table."""
+        """Format earnings records for ingest into `filings` table.
+        
+        The 10-K/-Q data is used to determine the earnings' yr_qtr filed;
+        otherwise, 8-K `file date` is the same as `submitted date`.
+        """
 
         df_tmp = self.query_database(table_name='filings')
         df_10q = df_tmp[df_tmp['form'].isin(['10-K','10-Q'])]
@@ -449,16 +450,11 @@ class Database:
                 df_to_commit = df_8k
 
             # load into db
-            try:
-                df_to_commit.to_sql(self.table_name[1]['name'], 
-                        con=self.engine,
-                        if_exists='append', 
-                        index=False
-                        )
-            except sql.exc.IntegrityError as e:
-                logger.warning('Unique key violation on insert')
-            else:
-                logger.info(f'Inserted {df_8k.shape[0]} records to table {self.table_name[1]["name"]}')
+            records_inserted = self.insert_df_to_table(df=df_to_commit,
+                                                        table_name=self.table_name[1]['name'],
+                                                        connection=self.engine
+                                                        )
+            logger.info(f'Inserted {records_inserted} 8-K records to table {self.table_name[1]["name"]}')
             return True
         else:
             return False
@@ -480,9 +476,20 @@ class Database:
         pass
 
 
-
-    def insert_df_to_table(self):
-        pass
+    def insert_df_to_table(self, df, table_name, connection):
+        """Insert unique (primary key) dataframe records into existing table."""
+        cntr = 0
+        for i in range(len(df)):
+            try:
+                df.iloc[i:i+1].to_sql(name=table_name, 
+                                        if_exists='append', 
+                                        con = connection,
+                                        index = False
+                                        )
+                cntr += 1
+            except sql.exc.IntegrityError as e:
+                pass
+        return cntr
 
 
     def update_database(self):

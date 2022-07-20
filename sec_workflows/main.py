@@ -79,7 +79,7 @@ def run_process():
     """Run process to poll API and update report event of new filings."""
     loop = True                                                                 #setup based on desired loop style
     while loop:
-        days = timedelta(days = 3)
+        days = timedelta(days = 3)                                              #TODO: change to last filing in db
         start_date = datetime.now().date() - days
         after_date = start_date.strftime("%Y-%m-%d")
         start_records = db.query_database('records').shape[0]

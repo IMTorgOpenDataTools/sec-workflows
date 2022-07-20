@@ -79,9 +79,10 @@ TODO
 ## TODO
 
 * phase-I:fix run
-  - main.py run add records (227 -> 236), but not filings (123) (sqlite> select * from records where filed > '2022-07-01 00:00:00.000000';)
-  - JPM(19617) is not updated: https://www.sec.gov/edgar/browse/?CIK=19617&owner=exclude, gets (-22-000414) instead of (-22-000410)
+  - ~~~main.py run add records (227 -> 236), but not filings (123) (sqlite> select * from records where filed > '2022-07-01 00:00:00.000000';)~~
+  - JPM(19617) is not updated: https://www.sec.gov/edgar/browse/?CIK=19617&owner=exclude, gets (-22-000414) instead of (-22-000410) (maybe because of the 3-day lag rule)
   - probably need to scrape `**Earnings release**` from the Company Search page
+  - ~~report is created, but not with new quarter (probably because `filings` table is not updated)~~
 * phase-II:automated account discovery
   - ~~update config/Firm_Account_Info.csv to reflect current use~~
   - mod config/Firm_Account_Info.csv: topic-based, incorporate timespans for each topic-title-tag (reporting changes over time)
